@@ -42,9 +42,8 @@ establish whether a device applied the settings. Do not retry automatically.
 **Results are observations, not proven working hardware.** `completed=False`
 means no observed standard completion; it also applies to the special 0xA0
 branch. A missing or negative 0x0C response does **not** block the next
-requested setup step. A missing/invalid Pair07 does stop the high-level
-sequence. The direct session
-closes after any provisioning attempt because the active credentials may have
+requested setup step. A missing or invalid Pair07 result stops the sequence. The direct session
+closes after an attempted sequence because the active credentials may have
 changed. No retries, rollback, cloud registration, lamp group membership edits
 or timing delays are performed automatically.
 

@@ -1,148 +1,64 @@
-# AwoX Modern Mesh protocol library
+# AwoX Modern Mesh
 
-Independent Python implementation of **AwoX Modern Mesh**, based on protocol
-analysis of AwoX HomeControl Android 1.14.10/1.14.11 and documented protocol
-reference data. The library logs in through an explicitly selected ESPHome
-Bluetooth proxy and encrypts commands with the session key. It also provides
-standalone frame encoders, decoders and offline tests.
+A Python library for discovering, controlling and provisioning AwoX Modern Mesh
+devices over an ESPHome Bluetooth proxy. It provides typed commands, low-level
+frame builders and decoders for device replies and advertisements.
 
-This is an independent interoperability project, not affiliated with AwoX,
-EGLO or ESPHome. Legacy Telink and OTA firmware updates are outside its scope.
-
-## Features
-
-- Explicit BLE connection and mesh login using one `AwoXMeshSession`.
-- Power, brightness, RGB/native color, color temperature, transitions and effects.
-- Scenes, group/broadcast commands and stored mesh-group membership.
-- Dual-Zone control, PIR, Quiet Mode and power-cut behavior.
-- Timers, programs, nightlight, dawn and presence simulation.
-- Time and timezone operations, status observations and BLE advertisements.
-- Direct-device provisioning and mesh removal.
-- Typed public Python API, 29 standalone examples and offline protocol tests.
-
-A completed GATT write **does not** establish that a device physically applied a
-command. Commands are not automatically retried, replayed, read back or rolled
-back. Some explicit convenience methods wait for a documented device response.
+The implementation is based on protocol analysis of AwoX HomeControl Android
+1.14.10 and 1.14.11. Device features vary by model. The project is independent of
+AwoX, EGLO and ESPHome. Legacy Telink and firmware updates are outside its scope.
 
 ## Installation
 
-Requires Python 3.10 or later. From the repository root:
+Clone this repository and run one of these commands from its root.
 
-```console
-python -m pip install -e ".[esphome]"
-```
+| Use | Command |
+| --- | --- |
+| Connect through an ESPHome Bluetooth proxy | `python -m pip install ".[esphome]"` |
+| Work with protocol codecs offline | `python -m pip install .` |
 
-For offline codecs and tests without ESPHome dependencies:
-
-```console
-python -m pip install -e .
-```
-
-The installed package is named `awox`; the distribution name is
-`awox-mesh-reconstruction`. It includes `awox/py.typed` for editor type support.
+The base package supports Python 3.10 and later. The ESPHome dependency check
+runs on Python 3.13, which is the tested setup for the proxy examples.
+The distribution is named `awox-mesh-reconstruction`. Import it as `awox`.
 
 ## First connection
 
-```python
-import asyncio
-from awox import AwoXMeshSession, Credentials, ESPHomeProxy
+Start with [Getting started](documentation/GETTING_STARTED.md) to obtain the
+proxy settings, mesh credentials and device identity. Then try
+[Example 06](examples/app_06_read_status.py) to connect and query a lamp without
+changing its settings.
 
-# Fill these values in your local copy only.
-PROXY_HOST = ""
-PROXY_KEY = ""
-MESH_NAME = ""
-MESH_PASSWORD = ""
-GATEWAY_MAC = ""
-LAMP_MAC = ""
-MESH_ID = 0
-
-
-async def main():
-    if not all((PROXY_HOST, MESH_NAME, GATEWAY_MAC, LAMP_MAC, MESH_ID)):
-        raise ValueError("Configure the proxy and lamp settings first")
-    async with ESPHomeProxy(PROXY_HOST, PROXY_KEY) as proxy:
-        async with AwoXMeshSession(
-            lambda: proxy.create_transport(GATEWAY_MAC),
-            Credentials(MESH_NAME, MESH_PASSWORD),
-            devices={MESH_ID: LAMP_MAC},
-        ) as mesh:
-            lamp = mesh.lamp(MESH_ID)
-            await lamp.set_power(True)
-            await lamp.set_brightness(50)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
-```
-
-These are local connection settings. The repository does not include personal
-credentials. The complete [status example](examples/app_06_read_status.py)
-shows a separate device-read workflow.
-
-For an active device read, use `await lamp.read_status()`. To retrieve a
-previously observed status without a BLE request, use `mesh.get_status(MESH_ID)`.
-Inside the connected session, for a command whose response you want to
-observe explicitly:
+After opening a session, a typical interaction looks like this:
 
 ```python
-from awox.groups import set_mesh_groups
-
-receipt = await mesh.send_and_track_reply(
-    set_mesh_groups(MESH_ID, [0x8000]),
-    0x0C,
-    target=MESH_ID,
-    timeout=5.0,
-)
-reply = await receipt.wait()
+lamp = mesh.lamp(mesh_id)
+await lamp.set_power(True)
+await lamp.set_brightness(50)
+status = await lamp.read_status()
 ```
 
-`reply` is `None` if no matching notification is observed within the response
-window. This code **writes the group list**; it is not a harmless query. Use
-`await lamp.set_mesh_groups([0x8000])` for a decoded result, or
-`await lamp.write_mesh_groups([0x8000])` for send-only behavior.
-
-## Examples
-
-The [29 standalone examples](examples/README.md) demonstrate discovery,
-lighting, groups, effects, persistent settings and provisioning. Editable
-connection values are grouped at the top of each file and left blank.
-
-Run an offline example immediately:
-
-```console
-python examples/app_04_model_registry.py
-```
-
-For a live example, configure the required values in
-`examples/app_06_read_status.py` and run that file. Examples that alter stored
-settings, mesh credentials or pairing identities explain their side effects.
-**Review these operations before running them on a device.**
+The first two calls send one command each. The third actively requests a
+device report. A successful Bluetooth write confirms the GATT operation.
+A status report describes the observed device state. To receive acknowledgements
+for commands that provide them, use the methods described in the Python API.
 
 ## Documentation
 
-- [Documentation index](documentation/README.md)
-- [Getting started](documentation/GETTING_STARTED.md)
-- [Command reference](documentation/COMMAND_REFERENCE.md)
-- [Python API and response handling](documentation/PYTHON_API.md)
-- [Examples](examples/README.md)
-- [Provisioning and removal](documentation/PROVISIONING.md)
-- [Architecture](documentation/ARCHITECTURE.md)
-- [Editor completion and typing](documentation/EDITOR_AUTOCOMPLETE.md)
-- [Offline testing](documentation/TESTING.md)
+- [Getting started](documentation/GETTING_STARTED.md) — settings, discovery and first connection
+- [Examples](examples/README.md) — 29 standalone scripts by task
+- [Python API](documentation/PYTHON_API.md) — sessions, commands, replies and timeouts
+- [Command reference](documentation/COMMAND_REFERENCE.md) — arguments and results
+- [Documentation index](documentation/README.md) — provisioning, device models, architecture and testing
 
-## Tests
+The library sends commands and exposes replies. Applications decide when to
+send another command, how to verify an outcome and whether to retry.
 
-```console
-python -m pip install pytest
-python -m pytest -q
-```
+## Development
 
-The tests use synthetic transports and stored protocol fixtures, not real
-Bluetooth hardware. Passing offline tests is not proof of operation for every
-physical device model. See [Testing](documentation/TESTING.md).
+Run the offline suite with `python -m pytest -q` after installing the package
+and pytest. See [Offline testing](documentation/TESTING.md) and
+[Contributing](CONTRIBUTING.md) for details. See [Security](SECURITY.md) for
+handling credentials and sharing example output.
 
-## Scope and license
-
-The license for this implementation is MIT; see [LICENSE](LICENSE) and
-[NOTICE.md](NOTICE.md) for third-party rights and the limits of the reference
-data. Contributions are described in [CONTRIBUTING.md](CONTRIBUTING.md).
+The implementation is released under the [MIT license](LICENSE). See
+[NOTICE.md](NOTICE.md) for project and reference-data information.

@@ -12,7 +12,9 @@ Replies lack an individual source address, so concurrent reads are ambiguous.
 ## Dual-zone and Quiet Mode
 
 `lighting.dual_zone_*` emits the original special layout; zone and raw state
-are explicit fields. Raw state 2 is not labeled toggle without evidence.
+are explicit fields. The high-level `set_dual_zone_power()` accepts a
+boolean `enabled` value. The frame builder also accepts raw state 2, whose
+behavior is unspecified.
 Quiet Mode accepts its explicit action, enabled bit and raw parameter.
 The session exposes the last raw signed result bytes, not a reliable addressed
 device confirmation. These layouts are APK-backed, not hardware-proven on every

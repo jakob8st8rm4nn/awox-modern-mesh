@@ -4,6 +4,7 @@ The signatures below show public call arguments. Some type annotations and
 internal arguments are omitted for readability. See [Python API](PYTHON_API.md)
 for response and timeout contracts, and [Provisioning](PROVISIONING.md) for
 device enrollment. The pure codecs build or decode bytes without BLE I/O.
+Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#lighting-values).
 
 ## Session and targets
 

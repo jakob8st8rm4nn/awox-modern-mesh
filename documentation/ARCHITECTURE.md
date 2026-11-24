@@ -19,9 +19,7 @@ The flat package separates pure protocol functions from communication:
 6. `AwoXMeshSession` owns observations and bounded response receipts. `Lamp`
    and `MeshTarget` are thin targets with no connection or independent cache.
 
-There is no feature-session inheritance chain, injectable runtime, workflow
-engine, command retry manager or separate provisioning connection class.
-The same session exposes independent setup operations on its direct device.
+The same session exposes lighting, status and direct-device setup operations.
 
 ## Bluetooth receive activation
 
@@ -35,8 +33,9 @@ to characteristic `1911` as part of receive activation.
 
 The caller chooses a target or builds a pure Frame. The current connection is
 captured; the connection serializes its writes, checks generation and encrypts
-with its current key. GATT writes use `response=True`. A transport response confirms the GATT write;
-a mesh result or execution readback requires a separate operation. A caller-provided frame is never replayed.
+with its current key. GATT writes use `response=True`. A transport response confirms the GATT
+write. A mesh reply or status readback is a separate observation. The library
+does not replay the frame.
 
 The frame's transition field requests a device fade; it is not a send delay.
 Default 200 ms matches the APK. Dual-zone `00 02` and ordinary `02 00` are

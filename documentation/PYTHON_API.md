@@ -11,24 +11,32 @@ editors such as Pylance.
 
 ## Command naming
 
-- `set_...` changes a setting. It waits for a reply only for commands whose
-  documented contract needs a reply. Common lighting, PIR and Quiet Mode
-  operations are send-only.
-- `write_...` is offered *in addition* for `set_mesh_groups`,
-  `set_power_cut_mode`, `set_presence_simulator`, and `set_time_with_timezone`.
-  These alternatives send without a device response wait.
-- `read_...` actively queries the device and waits for its response.
-- `get_...` returns observations already cached and performs no GATT I/O.
-- `set_power(True/False)` controls power using one boolean argument.
-- `save_scene()` and `recall_scene()` intentionally remain separate actions.
+| Prefix | Meaning |
+| --- | --- |
+| `set_...` | Change a device setting. Whether it waits for a device reply depends on the method. |
+| `write_...` | Send a setting change and return after the GATT write. Available for groups, power-cut mode, presence and time with timezone. |
+| `read_...` | Request a device value. The return contract describes how a missing or invalid reply is represented. |
+| `get_...` | Return an available cached value without a Bluetooth request. |
 
-`set_dual_zone_power(destination, zone, enabled)` uses a `bool`, just like
-`set_power`. The raw on-wire state 2 remains accessible via the pure
-`lighting.dual_zone_power()` builder, without inventing its meaning. Native
-brightness accepts 1..255 for both regular and Dual-Zone commands. Both
-percentage methods map 0..100% to the APK's 2..254 range. Native color uses
-hue 0..254 and saturation 0..255. Temperature uses 153..454 mired. Kelvin is converted to mired. There is **no public
-percent-based Dual-Zone color-temperature setter**.
+See the [command reference](COMMAND_REFERENCE.md) for arguments and the
+[operation table](#observable-contracts-for-public-convenience-operations) for
+the reply a method tracks.
+
+## Lighting values
+
+Brightness percentages map 0–100% to protocol values 2–254. Native brightness
+accepts 1–255 for regular and Dual-Zone commands. Native color accepts hue
+0–254 and saturation 0–255. White temperature accepts 153–454 mired. Kelvin
+methods convert to mired.
+
+For ordinary lighting methods with a `transition` parameter, use an integer
+multiple of 100 ms from 0 to 6,553,500 ms. The default is 200 ms. Zero requests
+an immediate change. The upper limit is the frame field's capacity. Actual
+fade timing depends on the device.
+
+Each ordinary lighting setter sends its own command. An application that
+requires a separate power command or spacing between writes supplies those
+steps explicitly.
 
 ## Status queries
 
@@ -145,9 +153,9 @@ use `awox.frames.decode_notification`.
 
 ## Observable contracts for public convenience operations
 
-The table describes the implemented operations. A tracked reply of “None”
-means the coroutine finishes after the transport write, without waiting for a
-mesh reply or verifying a physical change. BLE errors propagate.
+The table describes the implemented operations. “None” in the Tracked reply column means the operation returns after the
+transport write. `None` in the Return column may also indicate a timeout
+for a method that waits for a reply. BLE errors propagate.
 Methods on `lamp` use its mesh ID; Session-level methods take a destination
 where shown. No command is retried automatically.
 
@@ -186,7 +194,7 @@ where shown. No command is retried automatically.
 | `set_time()` | One 0x30 clock write | None | `None` after write |
 | `set_time_with_timezone()` | One 0x29 time-rule write | 0x29 | `Time29Ack` / `None` on timeout |
 | `write_time_with_timezone()` | One 0x29 time-rule write | None | `None` after write |
-| `set_mesh_credentials()` | Pair04/05 credential writes | No notification wait; Pair07 must be read separately | `None` after writes |
+| `set_mesh_credentials()` | Pair04/05 credential writes | None. Use `read_pair_response()` to check Pair07 | `None` after writes |
 | `set_network_parameters()` | One 0x03 network-parameter write | None | `None` after write |
 | `set_network_key()` | One 0x04 key write | None | `None` after write |
 | `provision()` | Optional 0x0C write, Pair04/05, Pair07 check, conditional 0x03/0x04, 0x83 observation | Pair07 read and 0x83; no mandatory 0x0C ACK | `ProvisioningResult(completed, mesh_id)`; missing 0x83 gives `completed=False`; invalid Pair07 raises; 0xA0 skips 0x03/0x04 |

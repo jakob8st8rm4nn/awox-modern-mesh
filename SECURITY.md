@@ -15,5 +15,4 @@ The cloud example masks common authentication fields, but names, account IDs
 and device addresses remain visible. Review output before sharing it.
 
 Report vulnerabilities privately to the repository maintainer. Do not include
-passwords, network keys or private account records in a public issue. A preferred
-private contact can be added when the repository is created.
+passwords, network keys or private account records in a public issue.

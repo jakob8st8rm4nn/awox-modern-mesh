@@ -4,8 +4,8 @@ The repository uses a `python/` source layout. Open the folder containing
 `pyproject.toml` in VS Code so `.vscode/settings.json` and `pyrightconfig.json`
 can locate the package without installing it first.
 
-For normal use from another project, install the package into that project's
-Python environment:
+To use the library in another project, activate that project's Python
+environment, then run the following from this repository's root:
 
 ```console
 python -m pip install -e ".[esphome]"
@@ -36,12 +36,3 @@ For scan callbacks, annotate the incoming `DiscoveredDevice`, or use the
 `AdvertisementRecord` type for stored advertisements. A container like
 `dict[str, AdvertisementRecord]` makes callbacks that collect scan results
 easier for static analyzers to reason about.
-
-If Pylance reports **unreachable code**, inspect the actual control flow and
-value narrowing; a callback scheduled by an external library may not be
-recognized by static analysis. Use explicit checks after the asynchronous
-observation window. A faded import may simply be unused.
-
-The 29 examples demonstrate typed session/target calls, checked optional
-fields and safe result handling. Python runtime behavior and editor markings
-are separate concerns.

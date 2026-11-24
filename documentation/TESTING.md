@@ -17,7 +17,7 @@ session tests using a fake GATT transport, and execution of all 29 examples
 with mocked external endpoints. The Bluetooth examples use the session code against simulated external
 connections. The cloud example uses a simulated endpoint.
 
-22,546 frozen comparisons cover addresses, group lists, scene slots, immediate
+The frozen test vectors cover addresses, group lists, scene slots, immediate
 light values, transitions, color conversions, dual-zone and query fields.
 These comparisons establish equality with stored reference values, not
 independent proof of the APK implementation. APK-derived exact-byte fixtures and model tables supply separate evidence.
