@@ -1,0 +1,14 @@
+# Changelog
+
+## [0.1.0.dev0] – Initial development release
+
+- AwoX Modern Mesh frame encoders, decoders and authenticated session support.
+- ESPHome Bluetooth proxy discovery, transport and advertisement monitoring.
+- Power, color, brightness, transitions, effects, scenes, groups and Dual-Zone.
+- Status, power-cut, PIR, Quiet Mode, schedules and presence operations.
+- Provisioning, factory credentials and mesh removal.
+- Typed API (`py.typed`), 29 standalone examples and offline regression tests.
+- Documentation for installation, public commands, protocol data and safety.
+
+This is a development release. Hardware behavior varies by supported model;
+offline tests do not replace verification on physical devices.

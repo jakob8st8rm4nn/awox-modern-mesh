@@ -1,0 +1,85 @@
+{
+  "provenance": "Synthetic offline ATT-AES vectors from static AwoX JNI-layout analysis and an independent AES engine; no device credentials or captured session keys.",
+  "vectors": [
+    {
+      "key": "a0c0a1e1d3735de7aeb11fb9366e78fc",
+      "packet": "7afa964ae7eee5e7166698a869f5742eadea972c",
+      "att_output": "371fb3b499b5d1aefdef42c35e8ae177"
+    },
+    {
+      "key": "a1ffab90af3a5a45aca8c6f6552f4882",
+      "packet": "c7564dd724d03f91d8e1cdb92def8ecd6e410afb",
+      "att_output": "d736c34338c54f5bc2f4037fd5537d82"
+    },
+    {
+      "key": "1c513d919840843b37a3c28735ceb6ab",
+      "packet": "e7b6d1eaf20583ed923b5c3c805f3086dfe06c86",
+      "att_output": "3fa47f894c352fc23d431d9cec3ef0ae"
+    },
+    {
+      "key": "ae55db9008f57a32d508de60184d3501",
+      "packet": "2e48f8e64da1c6c8a64a664b57569c3dd6a516a6",
+      "att_output": "bf64f0e8a4bb250e4c2c6eeb941367cd"
+    },
+    {
+      "key": "90cf0e5db472e616747bcd5843d7e0e4",
+      "packet": "da74923f6ec0ede5e87f526ad7b5669ee2781c36",
+      "att_output": "f14c02c4cbacd6b0e87e37c66c42cbc1"
+    },
+    {
+      "key": "dbb605074b8129b65c5bfdb965e60ec3",
+      "packet": "dd54f16536d8ca159934912fe9cd4b4222a125da",
+      "att_output": "1830dffbfc2135b304409d69e4ca333a"
+    },
+    {
+      "key": "5418667112c1e13e87262f31aa08aea6",
+      "packet": "71bcfaff38b975aea206db9230c48d7d0d7319df",
+      "att_output": "438ee888795e1ec9860d4016ed49b090"
+    },
+    {
+      "key": "ec82f4b26265da6b9a72d2354e7c2b6f",
+      "packet": "44eb7e932aed4bc2f2ca23b74bfa22799ea7d534",
+      "att_output": "93f8abd76bff50c83b96ce53fe7ca805"
+    },
+    {
+      "key": "ca41d4425adb1879933adb2b56d5dc52",
+      "packet": "017881130e84c1fd453aaaea29b0171dce10d1fa",
+      "att_output": "98784ae06494587e9d2d456c27e437d8"
+    },
+    {
+      "key": "e69248b17d9793cc88596c86b0fef479",
+      "packet": "bbb848181acca6dcd0fcc415c2c7db2332726f92",
+      "att_output": "df72f6e553b3a039c6e76412c5da2577"
+    },
+    {
+      "key": "097bf155524221491626e9a04bdac548",
+      "packet": "29a650a0f7e52dffb09cce483d436cb5bf175f62",
+      "att_output": "a0db3f4d421b06b9d6d6e68bae4dea7b"
+    },
+    {
+      "key": "e827aedf6663604035e77fe8ae1b8c98",
+      "packet": "0b59e16a513043a4588aed9ced3c5ff291607d1c",
+      "att_output": "68ca812e6ddfdf50827feab51058bb05"
+    },
+    {
+      "key": "9aeeea321493fd2da22a119103ce93f9",
+      "packet": "98719b79d72b9b0ee5466f7eac73cc942cf6ddca",
+      "att_output": "6ef8ac800d1b9e49c0d398d0052b8bbf"
+    },
+    {
+      "key": "18314c93ef43a9a582be0d995bbfca95",
+      "packet": "45a56113a142c6a1b44f3d824613a226bf6ed8ec",
+      "att_output": "b5d046bd72c38fa043021a547d9add32"
+    },
+    {
+      "key": "ceac766fe7e2ef2b122b8b8f0c52a036",
+      "packet": "898e650351de1a2e95978be4ec2fe24d59b486be",
+      "att_output": "58a87cc55db8a1813287ef2a933c0184"
+    },
+    {
+      "key": "88cf4cd77510f04c6a4e9635b889ebb0",
+      "packet": "f59ef3e7d98d007439bde70726093e8983b9beea",
+      "att_output": "9ecfa8df1e9fbd349c9c98259f5e0fa8"
+    }
+  ]
+}

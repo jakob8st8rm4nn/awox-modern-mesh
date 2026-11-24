@@ -1,0 +1,54 @@
+# Python / build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+.venv*/
+build/
+dist/
+.coverage*
+htmlcov/
+
+# All local secrets and developer-specific configuration
+.env
+.env.*
+!.env.example
+*credentials*.json
+**/credentials.py
+**/credentials.local.py
+**/cred.py
+secrets/
+
+# Transient diagnostics, reports and private hardware captures
+/audit/
+/documentation/archive/
+/updates/
+*.log
+*.jsonl
+*backup*/
+*_backup_*/
+/awox_decoder_backups/
+install_awox_*.py
+/local_*.py
+
+# Private example copies and editor/OS files
+/local/
+.vscode/*
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Private packet captures and proprietary application binaries
+*.pcap
+*.pcapng
+*.saz
+*.apk
+*.aab
+*.apks
+
+# Internal patch instructions and personal notes
+/PATCH_NOTES*.md
+/ToDo.txt
+/temp.txt

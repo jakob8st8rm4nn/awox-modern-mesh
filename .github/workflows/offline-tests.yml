@@ -1,0 +1,39 @@
+name: Offline tests
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ['3.10', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - run: python -m pip install . pytest
+      - run: python -m pytest -q
+
+  esphome-dependency-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install actual optional ESPHome dependencies
+        run: python -m pip install '.[esphome]' pytest
+      - name: Verify the optional packages were actually installed
+        run: python -c "import bleak_esphome, habluetooth, bleak"
+      - name: Record resolved dependency versions
+        run: |
+          python -m pip freeze > esphome-resolved-versions.txt
+          python -m pip show bleak-esphome habluetooth bleak
+      - name: Exercise installed ESPHome interfaces (no hardware)
+        run: python -m pytest -q tests/test_esphome_installed_dependencies.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: esphome-resolved-versions-py313
+          path: esphome-resolved-versions.txt

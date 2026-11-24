@@ -1,0 +1,6 @@
+include LICENSE NOTICE.md README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md RELEASE_CHECKLIST.md
+recursive-include documentation *.md
+recursive-include examples *.py *.md
+recursive-include python/awox py.typed
+recursive-include tests *.py *.md *.csv *.json *.gz
+global-exclude __pycache__ *.py[cod]
