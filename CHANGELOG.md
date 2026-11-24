@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.1.0.dev0] – Initial development release
+## [0.1.0] - 2026-11-25
 
 - AwoX Modern Mesh frame encoders, decoders and authenticated session support.
 - ESPHome Bluetooth proxy discovery, transport and advertisement monitoring.
@@ -10,5 +10,5 @@
 - Typed API (`py.typed`), 29 standalone examples and offline regression tests.
 - Documentation for installation, public commands, protocol data and safety.
 
-This is a development release. Hardware behavior varies by supported model;
-offline tests do not replace verification on physical devices.
+Hardware behavior varies by supported model.
+Check model-specific features on the intended hardware.
