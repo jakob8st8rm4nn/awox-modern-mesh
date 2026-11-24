@@ -37,7 +37,7 @@ class ProxyBoundedCleanupTests(unittest.IsolatedAsyncioTestCase):
                     with self.assertRaises(asyncio.CancelledError):
                         await closing
                 else:
-                    with self.assertRaises(TimeoutError):
+                    with self.assertRaises(asyncio.TimeoutError):
                         await asyncio.wait_for(asyncio.shield(closing), .3)
                 cleanup = proxy._cleanup_task
                 self.assertIsNotNone(cleanup)
@@ -46,7 +46,7 @@ class ProxyBoundedCleanupTests(unittest.IsolatedAsyncioTestCase):
                     await proxy.__aenter__()
                 with self.assertRaisesRegex(RuntimeError, 'another ESPHomeProxy'):
                     await ESPHomeProxy('other.invalid').__aenter__()
-                with self.assertRaises(TimeoutError):
+                with self.assertRaises(asyncio.TimeoutError):
                     await proxy.__aexit__()
                 self.assertIs(proxy._cleanup_task, cleanup)
                 self.assertEqual(calls, 1)

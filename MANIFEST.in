@@ -1,4 +1,4 @@
-include LICENSE NOTICE.md README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md RELEASE_CHECKLIST.md
+include LICENSE NOTICE.md README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md
 recursive-include documentation *.md
 recursive-include examples *.py *.md
 recursive-include python/awox py.typed

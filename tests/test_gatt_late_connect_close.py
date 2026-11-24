@@ -174,7 +174,7 @@ class LateConnectAndIdempotentCloseTests(unittest.IsolatedAsyncioTestCase):
         old = asyncio.create_task(channel.connect(lambda _: None))
         await backend.connect_entered.wait()
         try:
-            with self.assertRaises(TimeoutError):
+            with self.assertRaises(asyncio.TimeoutError):
                 await channel.close()
             backend.connect_release.set()
             with self.assertRaises(ConnectionLost):
