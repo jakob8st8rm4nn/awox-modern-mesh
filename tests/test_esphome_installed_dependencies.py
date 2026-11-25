@@ -66,6 +66,7 @@ class InstalledESPHomeInterfaces(unittest.TestCase):
         scanner = SimpleNamespace(_clients=set())
         backend = ESPHomeClient(
             device,
+            disconnected_callback=None,
             client_data=SimpleNamespace(
                 client=api, bluetooth_device=remote_device, scanner=scanner,
                 device_info=SimpleNamespace(bluetooth_proxy_feature_flags_compat=lambda _: 0),
