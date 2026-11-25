@@ -1,5 +1,10 @@
 # Changelog
 
+## [Unreleased]
+
+- Allow an existing mesh session to reconnect after ESPHome proxy loss once the
+  prior BLE connection is confirmed closed locally.
+
 ## [0.1.0] - 2026-11-25
 
 - AwoX Modern Mesh frame encoders, decoders and authenticated session support.

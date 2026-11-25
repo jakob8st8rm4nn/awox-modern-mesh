@@ -1,4 +1,4 @@
-"""One authenticated BLE channel. No retries or provisioning workflow."""
+"""One BLE channel with Mesh login. No retries or provisioning workflow."""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ class MeshConnection:
 
     @property
     def login_accepted(self) -> bool:
-        """Whether the current authenticated login has been accepted."""
+        """Whether the device accepted the current Mesh login."""
         return self.channel.active and self._session_key is not None
 
     def set_disconnect_observer(self, callback: Callable[[], None] | None) -> None:
@@ -261,7 +261,7 @@ class MeshConnection:
 
     @property
     def connected(self) -> bool:
-        """Whether this connection is currently authenticated and usable."""
+        """Whether the Mesh login was accepted and the connection is usable."""
         return self._ready and self.login_accepted
 
     def _receive(self, packet: bytes) -> None:

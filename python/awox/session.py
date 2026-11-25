@@ -1,4 +1,4 @@
-"""Explicit Modern Mesh operations through one authenticated connection.
+"""Explicit Modern Mesh operations through one connection with an accepted Mesh login.
 
 The session never chooses a gateway, retries a command or inserts a send delay.
 Explicit single-step operations leave continuation to the caller. Optional

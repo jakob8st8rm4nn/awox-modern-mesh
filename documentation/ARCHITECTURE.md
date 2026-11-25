@@ -81,6 +81,13 @@ Only one owner may use a transport/channel. A dropped connection invalidates
 old status, response windows and session-key use. Technical cleanup retains
 ownership until it succeeds; an abandoned backend task cannot silently become
 a new live session. Explicit reconnect is possible once cleanup is confirmed.
+After a proxy loss, the ESPHome transport can finish local cleanup even if
+the remote disconnect raises an API connection error. The BLE client and
+backend must already report disconnection before the attempt and still report
+it afterward. The wrapper must have released its scanner association. For a
+general API connection error, the proxy API must also report disconnection.
+Explicit reconnect remains the application's decision.
+
 These protections do not add application-level retries.
 
 A custom `GattTransport` must coordinate overlapping `connect()` and

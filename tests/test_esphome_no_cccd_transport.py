@@ -1,6 +1,6 @@
 """CCCD-free ESPHome transport tests, no actual BLE or network I/O."""
 import asyncio
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 import sys
 import unittest
 from unittest.mock import patch
@@ -8,6 +8,21 @@ from unittest.mock import patch
 from awox.esphome_transport import ESPHomeNoCCCDTransport
 from awox.frames import NOTIFY_UUID, SERVICE_UUID
 from awox.transport import GattChannel, GattOperation, OperationKind
+
+
+class APIConnectionError(Exception):
+    pass
+
+
+class ConnectionNotEstablishedAPIError(APIConnectionError):
+    pass
+
+
+def mock_api_errors():
+    api = ModuleType("aioesphomeapi.core")
+    api.APIConnectionError = APIConnectionError
+    api.ConnectionNotEstablishedAPIError = ConnectionNotEstablishedAPIError
+    return patch.dict(sys.modules, {"aioesphomeapi.core": api})
 
 
 class FakeBackend:
@@ -79,6 +94,58 @@ class TransportTest(unittest.IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         if self.ch.active:
             await self.ch.close()
+
+    async def test_disconnect_after_confirmed_proxy_loss_releases_client(self):
+        await self.check_confirmed_proxy_loss(ConnectionNotEstablishedAPIError, None)
+
+    async def test_generic_api_error_releases_client_if_proxy_api_is_down(self):
+        await self.check_confirmed_proxy_loss(APIConnectionError, False)
+
+    async def check_confirmed_proxy_loss(self, error_type, api_connected):
+        async def failed_disconnect():
+            raise RuntimeError("BLE wrapper") from error_type()
+
+        client = self.t._client
+        client.is_connected = False
+        client._backend.is_connected = False
+        if api_connected is not None:
+            client._backend._client = SimpleNamespace(is_connected=api_connected)
+        client._connected_scanner = None
+        with mock_api_errors():
+            with patch.object(client, "disconnect", failed_disconnect):
+                await self.ch.close()
+        self.assertEqual(self.t._cleanup_clients, [])
+        await self.ch.connect(lambda status: None)
+        self.assertIsNot(self.t._client, client)
+
+    async def test_proxy_error_during_disconnect_keeps_uncertain_client(self):
+        client = self.t._client
+        client._backend.is_connected = True
+        async def failed_disconnect():
+            client.is_connected = False
+            client._backend.is_connected = False
+            raise RuntimeError("BLE wrapper") from ConnectionNotEstablishedAPIError()
+
+        with mock_api_errors():
+            with patch.object(client, "disconnect", failed_disconnect):
+                with self.assertRaisesRegex(RuntimeError, "BLE wrapper"):
+                    await self.ch.close()
+        self.assertIn(client, self.t._cleanup_clients)
+        await self.t.disconnect()
+
+    async def test_generic_api_error_keeps_client_if_proxy_api_is_still_up(self):
+        async def failed_disconnect():
+            raise RuntimeError("BLE wrapper") from APIConnectionError()
+
+        client = self.t._client
+        client.is_connected = False
+        client._backend.is_connected = False
+        client._backend._client = SimpleNamespace(is_connected=True)
+        with mock_api_errors(), patch.object(client, "disconnect", failed_disconnect):
+            with self.assertRaisesRegex(RuntimeError, "BLE wrapper"):
+                await self.ch.close()
+        self.assertIn(client, self.t._cleanup_clients)
+        await self.t.disconnect()
 
     async def test_subscribe_notify_and_stop(self):
         packets = []

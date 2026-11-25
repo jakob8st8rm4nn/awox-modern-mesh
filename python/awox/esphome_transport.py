@@ -56,8 +56,8 @@ class _ESPHomeBleakTransportBase:
         # after a replacement connection. An epoch prevents that old result
         # from overwriting the active client (or leaking an orphaned link).
         self._connect_epoch = 0
-        # Own clients until their physical disconnect succeeds, even after
-        # replacement. Identity comparisons avoid backend equality semantics.
+        # Retain clients until teardown is complete, even after replacement.
+        # Identity comparisons avoid backend equality semantics.
         self._cleanup_clients = []
         self._cleanup_lock = asyncio.Lock()
 
@@ -67,7 +67,40 @@ class _ESPHomeBleakTransportBase:
         async with self._cleanup_lock:
             if not any(item is client for item in self._cleanup_clients):
                 return  # Another explicit cleanup already closed this client.
-            await client.disconnect()
+            backend = getattr(client, "_backend", None)
+            backend_type = getattr(self, "_backend_type", None)
+            already_down = (
+                backend_type is not None
+                and isinstance(backend, backend_type)
+                and getattr(backend, "is_connected", None) is False
+                and getattr(client, "is_connected", None) is False
+            )
+            try:
+                await client.disconnect()
+            except Exception as exc:
+                if (
+                    not already_down
+                    or getattr(backend, "is_connected", None) is not False
+                    or getattr(client, "is_connected", None) is not False
+                    or getattr(client, "_connected_scanner", None) is not None
+                ):
+                    raise
+                try:
+                    from aioesphomeapi.core import APIConnectionError, ConnectionNotEstablishedAPIError
+                except ImportError:
+                    raise exc from None
+                # bleak-esphome can still attempt a remote disconnect after
+                # its proxy-loss callback has already closed the local link.
+                api_error = exc if isinstance(exc, APIConnectionError) else exc.__cause__
+                api_client = getattr(backend, "_client", None)
+                if not (
+                    isinstance(api_error, ConnectionNotEstablishedAPIError)
+                    or (
+                        isinstance(api_error, APIConnectionError)
+                        and getattr(api_client, "is_connected", None) is False
+                    )
+                ):
+                    raise
             self._cleanup_clients[:] = [
                 item for item in self._cleanup_clients if item is not client
             ]
