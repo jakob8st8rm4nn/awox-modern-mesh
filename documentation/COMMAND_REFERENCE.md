@@ -218,6 +218,7 @@ Missing or expired observations return `None`. Use
 
 | Function | Behavior |
 | --- | --- |
+| `AwoXModel.color_temperature_range_kelvin` | Return `(min_kelvin, max_kelvin)` for adjustable white. Use the documented model range when available or 2200–6500 K otherwise, including Dual Zone. Return `None` for fixed-white, RGBW and other devices without adjustable white. |
 | `lookup_dual_zone_properties(name: str, zone: int) -> tuple[str, ...] \| None` | Return the APK controls for zone 0 or 1 of a known Dual Zone model. |
 | `lookup_fixed_white_picker_percent(name: str) -> int \| None` | Return the APK's fixed white-picker setting in percent when known. |
 

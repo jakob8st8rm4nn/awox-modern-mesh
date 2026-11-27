@@ -121,15 +121,18 @@ def mired_from_kelvin(kelvin: int) -> int:
 
     The device reports mired values and a nominal 153..454 range. Kelvin
     conversion is a UI convenience, not verified against the Android slider.
-    This rounding accepts integer Kelvin values 2201..6557; these are
+    2200 K maps to the device maximum of 454 mired. The accepted
+    integer Kelvin values are 2200..6557; these are
     conversion bounds, not independently verified model-specific limits.
     """
     if type(kelvin) is not int or kelvin <= 0:
         raise ValueError("kelvin must be a positive integer")
+    if kelvin == 2200:
+        return MAX_MIREDS
     mired = (1_000_000 + kelvin // 2) // kelvin
     if not MIN_MIREDS <= mired <= MAX_MIREDS:
         raise ValueError(
-            "kelvin must round to 153..454 mired (integer Kelvin range 2201..6557)"
+            "kelvin must be an integer from 2200 to 6557"
         )
     return mired
 

@@ -20,12 +20,35 @@ from typing import Literal
 class AwoXModel:
     """Model name and transport family confirmed by the Android registry.
 
-    This is intentionally NOT a capability/feature declaration. In particular
-    `modern` does not imply RGB, tunable white, PIR or OTA support.
+    The transport family alone does not indicate device capabilities.
     """
 
     name: str
     protocol: Literal["modern"]
+
+    @property
+    def color_temperature_range_kelvin(self) -> tuple[int, int] | None:
+        """Return (min, max) for adjustable white, or None if unavailable."""
+        from .model_properties import lookup_dual_zone_properties, lookup_model_properties
+
+        properties = lookup_model_properties(self.name) or ()
+        if "white_temperature" in properties or lookup_dual_zone_properties(self.name, 0):
+            return _COLOR_TEMPERATURE_RANGES_KELVIN.get(
+                self.name, _DEFAULT_COLOR_TEMPERATURE_RANGE_KELVIN
+            )
+        return None
+
+
+_DEFAULT_COLOR_TEMPERATURE_RANGE_KELVIN = (2200, 6500)
+_COLOR_TEMPERATURE_RANGES_KELVIN = MappingProxyType({
+    "EBF-RGB-Zm": (2700, 6500),
+    "EBF-RGB-Zm-CLP": (2700, 6500),
+    "EGLO-ZM-RGB-TW": (2700, 6500),
+    "ESMLFzm-w6-TW": (2200, 6500),
+    "ESMLzm-TW-GU10": (2700, 6500),
+    "EZMB-RGB-TW-CLB": (2700, 6500),
+    "EZMB-RGB-TW-I2C": (2700, 6500),
+})
 
 
 _MODELS = (
@@ -79,7 +102,7 @@ _MODELS = (
     "GENLzm",
 )
 
-# Immutable internal mapping. Constructed once, no I/O and no dependencies.
+# Immutable internal mapping, constructed once without I/O.
 _MODELS = MappingProxyType({name: AwoXModel(name, "modern") for name in _MODELS})
 
 

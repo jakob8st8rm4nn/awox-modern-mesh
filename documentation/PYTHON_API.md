@@ -36,7 +36,7 @@ Brightness percentages map 0–100% to protocol values 2–254. Raw brightness
 accepts 1–255 for regular and Dual-Zone commands. `set_hs()` and
 `set_dual_zone_hs()` take hue in degrees from 0 through 360 inclusive and
 saturation in percent from 0 to 100. A 360° input encodes as raw hue 254.
-The `*_hs_raw()` methods take raw hue 0–254 and saturation 0–255. White temperature accepts 153–454 mired.
+The `*_hs_raw()` methods take raw hue 0–254 and saturation 0–255. White temperature accepts 153–454 mired. The Kelvin setters encode 2200 K as 454 mired.
 The `*_color_temperature_kelvin()` methods convert Kelvin to mired.
 
 For ordinary lighting methods with a `transition` parameter, use an integer
@@ -49,6 +49,14 @@ requires a separate power command or spacing between writes supplies those
 steps explicitly.
 
 ## Model metadata
+
+`AwoXModel.color_temperature_range_kelvin` returns `(min_kelvin, max_kelvin)`
+for adjustable white. Models with a documented range specific to their model
+name use that range. Other models with adjustable white, including Dual Zone
+models with no documented zone-specific limits, use the 2200–6500 K control
+range. Actual limits can vary by device. Fixed-white and RGBW models, and
+other devices without adjustable white, return `None`. Kelvin setters use
+protocol limits independently of this property.
 
 `lookup_dual_zone_properties(model_name, zone)` exposes the APK's controls
 for the two zones of known Dual Zone models. Zone 0 includes RGB, while both

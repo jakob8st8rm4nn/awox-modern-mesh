@@ -38,6 +38,29 @@ class ModelRegistryTests(unittest.TestCase):
                       'eglo-zm-rgb-tw', '', 'brand-new-modern', None, b'EGLO-ZM-RGB-TW'):
             self.assertIsNone(lookup_model(value))
 
+    def test_color_temperature_range_kelvin(self):
+        expected = {
+            "EBF-RGB-Zm": (2700, 6500),
+            "EBF-RGB-Zm-CLP": (2700, 6500),
+            "EGLO-ZM-RGB-TW": (2700, 6500),
+            "ESMLzm-TW-GU10": (2700, 6500),
+            "EZMB-RGB-TW-CLB": (2700, 6500),
+            "EZMB-RGB-TW-I2C": (2700, 6500),
+            "ESMLFzm-w6-TW": (2200, 6500),
+            "EGLO-ZM-TW": (2200, 6500),
+            "EDUAL-RGBTW-TW": (2200, 6500),
+            "EGLO-ZM-Dimmable": None,
+            "EGLO-ZM-RGB-W": None,
+            "EGLO-ZMB-RGB-W": None,
+            "EMAT-RGB-W-I2C": None,
+            "EZMB-RGB-W-I2C": None,
+            "EPIR-Zm": None,
+            "ERCU-Zm": None,
+        }
+        for name, temperature_range in expected.items():
+            with self.subTest(name=name):
+                self.assertEqual(lookup_model(name).color_temperature_range_kelvin, temperature_range)
+
     def test_model_is_immutable(self):
         model = lookup_model('EGLO-ZM-RGB-TW')
         with self.assertRaises(FrozenInstanceError):

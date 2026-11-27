@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Expose `AwoXModel.color_temperature_range_kelvin` for models with adjustable white.
+
 ## [1.0.0] - 2026-11-27
 
 - Expose `is_valid_unicast_mesh_id()` for validating individual device addresses.

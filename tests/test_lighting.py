@@ -69,6 +69,11 @@ class LightingCodecTests(unittest.TestCase):
         self.assertEqual(open_frame(KEY, build_brightness_percent(KEY, DEVICE_ID, 50)).data, bytes.fromhex('9c dd 01 08 00 04 80 02 00 00 00 00'))
 
     def test_kelvin_conversion_and_frame(self):
+        self.assertEqual(mired_from_kelvin(2200), 454)
+        self.assertEqual(
+            open_frame(KEY, build_temperature_kelvin(KEY, DEVICE_ID, 2200)).data,
+            bytes.fromhex("9c dd 01 00 03 0a c6 01 02 00"),
+        )
         self.assertEqual(mired_from_kelvin(3000), 333)
         self.assertEqual(open_frame(KEY, build_temperature_kelvin(KEY, DEVICE_ID, 3000)).data, bytes.fromhex('9c dd 01 00 03 0a 4d 01 02 00'))
 
@@ -82,7 +87,7 @@ class LightingCodecTests(unittest.TestCase):
         for bad in (152, 455, 153.0, False, None):
             with self.subTest(mired=bad), self.assertRaises(ValueError):
                 temperature_payload_mired(bad)
-        for bad in (1, 2000, 10000, 3000.1, False):
+        for bad in (1, 2000, 2199, 6558, 10000, 3000.1, False):
             with self.subTest(kelvin=bad), self.assertRaises(ValueError):
                 mired_from_kelvin(bad)
 
