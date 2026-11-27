@@ -2,7 +2,11 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-27
+
 - Expose `AwoXModel.color_temperature_range_kelvin` for models with adjustable white.
+- Accept 2200 K in Kelvin setters and encode it as 454 mired.
+- Rename the project to EGLO connect.z Python.
 
 ## [1.0.0] - 2026-11-27
 
