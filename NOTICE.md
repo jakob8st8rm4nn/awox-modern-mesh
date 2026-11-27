@@ -1,6 +1,6 @@
 # Project and reference data
 
-This is an independent implementation of the AwoX Modern Mesh protocol. It is not affiliated with or endorsed by AwoX, EGLO, or ESPHome. Product and project names identify interoperability targets and remain the property of their respective owners.
+This is an independent implementation of the Bluetooth protocol used by AwoX HomeControl. It is not affiliated with or endorsed by AwoX, EGLO, or ESPHome. Product and project names identify interoperability targets and remain the property of their respective owners.
 
 The implementation was developed from analysis of AwoX HomeControl Android versions 1.14.10 and 1.14.11 and protocol reference data. Model names, descriptor codes, and property-list fixtures record compatibility-related reference data; they do not guarantee device capabilities. Proprietary APKs, native application binaries, personal captures, and private configurations are not distributed with this project.
 

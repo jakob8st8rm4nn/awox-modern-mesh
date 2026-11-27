@@ -1,6 +1,6 @@
 # Contributing
 
-Keep changes focused on the **Modern Mesh protocol**. The library intentionally does not implement a Home Assistant integration, retry policies, automatic reconnection, or application-specific command delays.
+Keep changes focused on the **Bluetooth protocol used by AwoX HomeControl**. The library intentionally does not implement a Home Assistant integration, retry policies, automatic reconnection, or application-specific command delays.
 
 Before submitting a change:
 

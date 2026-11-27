@@ -126,7 +126,7 @@ def manufacturer_firmware(data: bytes) -> str:
 
 @dataclass(frozen=True)
 class AdvertisementLightState:
-    """APK n7.k/n7.l light bytes for registered Modern Mesh lamps.
+    """APK n7.k/n7.l light bytes for registered lamp models.
 
     Values describe a *broadcast advertisement*, not a verified GATT status.
     Mode-inapplicable fields and the 0xFFFF temperature sentinel are None.

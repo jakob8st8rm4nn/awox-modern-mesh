@@ -1,4 +1,4 @@
-"""Pure, explicit Modern Mesh time encoders from APK i9.s / i9.t.
+"""Pure, explicit mesh time encoders from APK i9.s / i9.t.
 
 No wall-clock access, Bluetooth, login, retry, automatic timezone generation or
 implicit device write. Both original query payloads deliberately omit a target

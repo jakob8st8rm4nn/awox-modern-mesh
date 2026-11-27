@@ -1,4 +1,4 @@
-"""Provision one factory lamp into an existing Modern Mesh.
+"""Provision one factory lamp into an existing mesh network.
 
 Supply the existing mesh credentials and 16-byte network key. This changes
 persistent device settings and can assign a new ID. No group configuration,

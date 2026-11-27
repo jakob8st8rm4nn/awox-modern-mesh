@@ -1,4 +1,4 @@
-"""Conservative modern-mesh light status parser and per-device RAM store.
+"""AwoX light status parser and per-device RAM store.
 
 Hardware captures confirm the EGLO-ZM-RGB-TW 20-byte layout. This lighting
 view additionally requires an APK-registered lamp model; RCU, PIR and unknown

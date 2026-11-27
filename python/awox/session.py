@@ -1,4 +1,4 @@
-"""Explicit Modern Mesh operations through one connection with an accepted Mesh login.
+"""Explicit AwoX mesh operations through one connection with an accepted Mesh login.
 
 The session never chooses a gateway, retries a command or inserts a send delay.
 Explicit single-step operations leave continuation to the caller. Optional
@@ -351,7 +351,7 @@ class AwoXMeshSession:
 
     @property
     def mesh_states(self) -> dict[tuple[int, int], MeshStatusFrame]:
-        """Raw Modern status keyed by (mesh_id, zone_raw), independent of the lamp cache."""
+        """Raw mesh status keyed by (mesh_id, zone_raw), independent of the lamp cache."""
         if not self.connected:
             return {}
         return {k: v for k, v in self._mesh_statuses.items() if self._fresh(v)}
@@ -1203,7 +1203,7 @@ class AwoXMeshSession:
                     await connection.connect()
                     if not connection.connected:
                         raise ConnectionLost(
-                            "modern mesh disconnected during initialization"
+                            "AwoX mesh disconnected during initialization"
                         )
                     return connection
 

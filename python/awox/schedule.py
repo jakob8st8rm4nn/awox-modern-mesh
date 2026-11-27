@@ -1,4 +1,4 @@
-"""APK 1.14.10/1.14.11 Modern-Mesh schedule configuration and replies.
+"""APK 1.14.10/1.14.11 mesh schedule configuration and replies.
 
 Read-only queries/responses use 0x35; configuration writes/replies use
 0x33, as documented by j9.e/i9.e, j9.r/i9.r and h9.i/g9.j. No firmware timing, persistence or slot count

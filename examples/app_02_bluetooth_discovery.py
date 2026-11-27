@@ -20,7 +20,7 @@ async def main():
         # Observe nearby devices for 15 seconds; no lamp connection is opened.
         devices = await proxy.scan_mesh_devices(duration=15)
         if not devices:
-            print("No AwoX Modern Mesh advertisements detected by the proxy.")
+            print("No compatible AwoX advertisements detected by the proxy.")
         for device in devices:
             print("MAC:", device.address)
             print("RSSI:", device.rssi)

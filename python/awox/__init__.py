@@ -1,4 +1,4 @@
-"""AwoX Modern Mesh protocol building blocks. Importing performs no I/O."""
+"""AwoX HomeControl Bluetooth protocol building blocks. Importing performs no I/O."""
 
 from ._validation import is_valid_unicast_mesh_id
 from .authentication import Credentials

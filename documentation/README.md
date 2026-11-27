@@ -7,7 +7,7 @@ pages explain results, response handling and transport boundaries.
 - [Getting started](GETTING_STARTED.md): installation, credentials and first connection.
 - [Command reference](COMMAND_REFERENCE.md): public methods, signatures and brief behavior.
 - [Python API](PYTHON_API.md): session lifecycle, replies, schedules and provisioning.
-- [Modern Mesh features](MODERN_MESH_EXTENSIONS.md): device-specific functions and field restrictions.
+- [Model-specific protocol features](DEVICE_FEATURES.md): device-specific functions and field restrictions.
 - [Provisioning and removal](PROVISIONING.md): factory login and direct-device setup.
 - [Advertisement API](ADVERTISEMENT_API.md): scan records, fields and callbacks.
 - [Architecture](ARCHITECTURE.md): module responsibilities and transport ownership.

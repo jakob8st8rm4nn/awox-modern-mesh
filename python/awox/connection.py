@@ -27,7 +27,7 @@ from .transport import (
 
 
 class MeshConnection:
-    """One Modern-Mesh GATT login attempt, receive activation and explicit writes.
+    """One AwoX GATT login attempt, receive activation and explicit writes.
 
     `login_accepted` means the protocol response was 0x0D with at least 8 bytes
     of challenge data and the key was derived. It is NOT an authenticated ACK.
@@ -152,7 +152,7 @@ class MeshConnection:
                 present = services.get(SERVICE_UUID, frozenset())
                 if not {PAIR_UUID, COMMAND_UUID, NOTIFY_UUID}.issubset(present):
                     raise MissingCharacteristic(
-                        "modern mesh pair/command/notify characteristics not found"
+                        "AwoX mesh pair/command/notify characteristics not found"
                     )
                 random = self._random_bytes(8)
                 if not isinstance(random, (bytes, bytearray, memoryview)):
@@ -206,7 +206,7 @@ class MeshConnection:
         notification kind, layout and individual-device identity.
         """
         if not self.login_accepted:
-            raise ConnectionLost("modern mesh session is not active")
+            raise ConnectionLost("AwoX mesh session is not active")
         return decode_notification(self._session_key, packet)
 
     async def _write_command_packet(

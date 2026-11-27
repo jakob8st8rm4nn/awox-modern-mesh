@@ -1,4 +1,4 @@
-"""Modern-Mesh EGLO presence simulator 0x3C read response (APK 1.14.10/11).
+"""EGLO presence simulator 0x3C read response (APK 1.14.10/11).
 
 Read/write configuration codecs and response parsing; no automation or
 background work. This module performs no device I/O.

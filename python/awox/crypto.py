@@ -1,4 +1,4 @@
-"""Modern-Mesh ATT AES cryptography from the AwoX native library.
+"""ATT AES cryptography from the AwoX native library.
 
 Each key and data block must contain exactly 16 bytes. Bytes, bytearray and
 memoryview buffers are accepted and copied to immutable bytes before use.

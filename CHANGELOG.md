@@ -36,7 +36,7 @@
 
 ## [0.1.0] - 2026-11-25
 
-- AwoX Modern Mesh frame encoders, decoders and mesh login support.
+- AwoX HomeControl Bluetooth frame encoders, decoders and mesh login support.
 - ESPHome Bluetooth proxy discovery, transport and advertisement monitoring.
 - Power, color, brightness, transitions, effects, scenes, groups and Dual-Zone.
 - Status, power-cut, PIR, Quiet Mode, schedules and presence operations.

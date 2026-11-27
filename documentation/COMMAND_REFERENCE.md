@@ -264,7 +264,7 @@ These builders prepare fields for a later schedule or presence write.
 
 The `with_…` methods return an updated settings value. A later encoder can
 normalize protocol fields, such as time mode for timers and part markers for
-paired writes. See [Modern Mesh features](MODERN_MESH_EXTENSIONS.md).
+paired writes. See [model-specific protocol features](DEVICE_FEATURES.md).
 
 ## schedule
 

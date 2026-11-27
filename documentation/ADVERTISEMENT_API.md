@@ -3,7 +3,7 @@
 `advertisements.AdvertisementRecord` parses manufacturer data and raw AD fields.
 Layout selection follows model/firmware/address rules from the APK; the caller
 does not manually select a parser family. The model tables cover 48 registered
-Modern Mesh names, codes and descriptor-property lists from both APK versions.
+model names, codes and descriptor-property lists from both APK versions.
 Known lamp, ERCU, EPIR, compact and full-MAC layouts remain distinct.
 
 Records retain raw data and available metadata when a packet is short or a

@@ -1,4 +1,4 @@
-"""Modern Mesh framing and GATT UUIDs. No I/O or device policy."""
+"""AwoX Bluetooth framing and GATT UUIDs. No I/O or device policy."""
 
 from __future__ import annotations
 

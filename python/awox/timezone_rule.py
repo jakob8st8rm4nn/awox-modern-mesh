@@ -1,4 +1,4 @@
-"""Offline formatting of APK Modern-Mesh POSIX time-zone rules.
+"""Offline formatting of APK POSIX time-zone rules.
 
 Reconstruction of the *pure formatting* portions of Android i9.e0 (1.14.11)
 / j9.e0 (1.14.10), and i9.t.c's rule assembly. The caller must provide

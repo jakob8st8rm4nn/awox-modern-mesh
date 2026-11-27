@@ -1,8 +1,8 @@
-# AwoX Modern Mesh
+# EGLO connect.z Python
 
-A Python library for discovering, controlling and provisioning AwoX Modern Mesh
-devices over an ESPHome Bluetooth proxy. It provides typed commands, low-level
-frame builders and decoders for device replies and advertisements.
+An unofficial Python library for discovering, controlling and provisioning
+EGLO connect.z devices over Bluetooth via ESPHome proxies. It provides typed
+commands, low-level frame builders and decoders for replies and advertisements.
 
 The implementation is based on protocol analysis of AwoX HomeControl Android
 1.14.10 and 1.14.11. Device features vary by model. The project is independent of

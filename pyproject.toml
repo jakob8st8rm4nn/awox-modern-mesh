@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "awox-mesh-reconstruction"
 version = "1.0.0"
-description = "AwoX Modern Mesh protocol over ESPHome Bluetooth proxies"
+description = "Unofficial Python library for controlling EGLO connect.z devices over Bluetooth via ESPHome proxies."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE", "NOTICE.md"]

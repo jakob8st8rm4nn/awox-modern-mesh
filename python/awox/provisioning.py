@@ -35,7 +35,7 @@ def factory_credentials(
         or len(model_code) != 2
         or not lookup_models_by_code(model_code)
     ):
-        raise ValueError("model_code must be a registered Modern Mesh lookup code")
+        raise ValueError("model_code must be a registered AwoX model lookup code")
     if not isinstance(firmware, str) or not re.fullmatch(
         r"\d+\.\d+\.\d+", firmware, re.ASCII
     ):
