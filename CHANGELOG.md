@@ -2,13 +2,13 @@
 
 ## [Unreleased]
 
-- Expose `is_valid_unicast_mesh_id()` for validating individual device addresses.
+## [1.0.0] - 2026-11-27
 
+- Expose `is_valid_unicast_mesh_id()` for validating individual device addresses.
 - Allow an existing mesh session to reconnect after ESPHome proxy loss once the
   prior BLE connection is confirmed closed locally.
 - Check that Pair, Command and Notify are present in the same GATT service
   before starting the mesh login.
-
 - Read supported main lamp `da.b` and `da.c` lamp status frames and
   apply the registered lamp model check to `da.d` as well.
 - Expose Dual Zone controls and the fixed RGBW white-picker setting as model
@@ -20,11 +20,19 @@
   As in the APK, valid Dual Zone reports map raw value 1 to zone 0 and other
   raw values to zone 1.
 - Restrict public Dual-Zone setters to integer zones 0 and 1.
-
 - Rename the brightness, Kelvin and raw hue/saturation methods to state their
   input units, and rename the PIR reading to `read_pir_luminosity_raw()`.
   Add `set_hs()` and `set_dual_zone_hs()` for degrees and percent.
   Both accept hue through 360°, which encodes as raw hue 254.
+
+### Upgrading from 0.1.0
+
+- Use the explicit brightness, Kelvin and HS setter names documented in the
+  command reference, and use `read_pir_luminosity_raw()` for PIR readings.
+- Use `LampStatus.hs_raw` for the hue/saturation pair, `LampStatus.zone`
+  for the logical zone and `MeshStatusFrame.zone_raw` for the wire value.
+- For a known Dual Zone lamp, `on_status` now reports both zones. Use
+  `status.zone` when routing updates to separate light controls.
 
 ## [0.1.0] - 2026-11-25
 
