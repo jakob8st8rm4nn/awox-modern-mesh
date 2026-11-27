@@ -13,7 +13,7 @@ import json
 import re
 import uuid
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 
 # Cloud account settings (do not commit your real credentials).
@@ -37,6 +37,11 @@ SECRET_FIELD = re.compile(  # Fields masked in the displayed JSON
 )
 
 
+class NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def request_json(url, installation_id, payload, session_token=None):
     """Send one Parse request; callers choose read operations via _method=GET."""
     headers = {
@@ -49,7 +54,7 @@ def request_json(url, installation_id, payload, session_token=None):
         headers["X-Parse-Session-Token"] = session_token
     request = Request(url, json.dumps(payload).encode("utf-8"), headers, method="POST")
     try:
-        with urlopen(request, timeout=20) as response:
+        with build_opener(NoRedirect()).open(request, timeout=20) as response:
             data = json.load(response)
         if not isinstance(data, dict):
             raise RuntimeError("Invalid cloud response: expected a JSON object")
@@ -57,6 +62,8 @@ def request_json(url, installation_id, payload, session_token=None):
     except (json.JSONDecodeError, UnicodeDecodeError):
         raise RuntimeError("Cloud service returned invalid JSON") from None
     except HTTPError as exc:
+        if 300 <= exc.code < 400:
+            raise RuntimeError(f"Cloud HTTP redirect refused ({exc.code})") from None
         raise RuntimeError(f"Cloud HTTP error {exc.code} at {url.split('/parse/')[0]}") from None
     except (URLError, TimeoutError, OSError) as exc:
         raise RuntimeError("Cloud service is unreachable") from exc

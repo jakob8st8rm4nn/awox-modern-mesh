@@ -32,7 +32,7 @@ async def main():
             lamp = mesh.lamp(MESH_ID)
             await lamp.set_power(True)  # Make the following change visible.
             print("Lamp ON command sent for observation.")
-            await lamp.set_color_temperature(3000)
+            await lamp.set_color_temperature_kelvin(3000)
             print("White temperature set to 3000 K (write completed).")
 
             await asyncio.sleep(2)

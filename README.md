@@ -33,7 +33,7 @@ After opening a session, a typical interaction looks like this:
 ```python
 lamp = mesh.lamp(mesh_id)
 await lamp.set_power(True)
-await lamp.set_brightness(50)
+await lamp.set_brightness_percent(50)
 status = await lamp.read_status()
 ```
 

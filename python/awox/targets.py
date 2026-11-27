@@ -17,7 +17,7 @@ from .schedule import SchedulePart, ScheduleRead, ScheduleWritePart, ScheduleWri
 from .presence import PresenceRead, PresenceWritePart, PresenceSetResponse
 from .pir import PirSettings
 from ._validation import _valid_mesh_destination
-from .lighting import color_payload_native, rgb_to_native
+from .lighting import color_payload_native, hsv_to_native, rgb_to_native
 from .lighting import DEFAULT_TRANSITION
 from .lighting import _candle_payload, _color_cycle_payload, _scene_payload
 from .lighting import (
@@ -58,7 +58,7 @@ class MeshTarget:
             raise TypeError("enabled must be bool")
         await self._send(b"\x00\x06", bytes((enabled,)))
 
-    async def set_brightness_native(
+    async def set_brightness_raw(
         self, level: int, *, transition: int = DEFAULT_TRANSITION
     ) -> None:
         """Send native brightness 1..255; transition in milliseconds (default 200)."""
@@ -66,7 +66,7 @@ class MeshTarget:
             b"\x00\x08", brightness_payload_native(level, transition=transition)
         )
 
-    async def set_brightness(
+    async def set_brightness_percent(
         self, percent: int, *, transition: int = DEFAULT_TRANSITION
     ) -> None:
         """Set 0..100%; transition is in milliseconds (default 200).
@@ -74,7 +74,7 @@ class MeshTarget:
         Integer percentages use the APK MathUtils numeric rounding rule;
         this does not establish end-to-end Android slider behavior.
         """
-        await self.set_brightness_native(
+        await self.set_brightness_raw(
             brightness_native_from_percent(percent), transition=transition
         )
 
@@ -89,7 +89,7 @@ class MeshTarget:
             b"\x03\x00", temperature_payload_mired(mired, transition=transition)
         )
 
-    async def set_color_temperature(
+    async def set_color_temperature_kelvin(
         self, kelvin: int, *, transition: int = DEFAULT_TRANSITION
     ) -> None:
         """Set Kelvin; transition in milliseconds (default 200).
@@ -100,13 +100,20 @@ class MeshTarget:
             mired_from_kelvin(kelvin), transition=transition
         )
 
-    async def set_color_native(
-        self, hue: int, saturation: int, *, transition: int = DEFAULT_TRANSITION
+    async def set_hs_raw(
+        self, hue_raw: int, saturation_raw: int, *, transition: int = DEFAULT_TRANSITION
     ) -> None:
-        """Set native HSV; transition in milliseconds (default 200)."""
+        """Set raw hue 0..254 and saturation 0..255, with a transition in ms."""
         await self._send(
-            b"\x03\x00", color_payload_native(hue, saturation, transition=transition)
+            b"\x03\x00", color_payload_native(hue_raw, saturation_raw, transition=transition)
         )
+
+    async def set_hs(
+        self, hue_degrees: float, saturation_percent: float, *, transition: int = DEFAULT_TRANSITION
+    ) -> None:
+        """Send hue in degrees (0..360) and saturation in percent (0..100)."""
+        hue, saturation = hsv_to_native(hue_degrees, saturation_percent / 100)
+        await self.set_hs_raw(hue, saturation, transition=transition)
 
     async def set_rgb(
         self, red: int, green: int, blue: int, *, transition: int = DEFAULT_TRANSITION
@@ -118,7 +125,7 @@ class MeshTarget:
         encoder, hue=0/saturation=0 and brightness remains unchanged.
         """
         hue, saturation = rgb_to_native(red, green, blue)
-        await self.set_color_native(hue, saturation, transition=transition)
+        await self.set_hs_raw(hue, saturation, transition=transition)
 
     async def set_candle_mode(self, enabled: bool) -> None:
         """APK set_candle_mode: one effect write, no automatic power-on.
@@ -170,6 +177,10 @@ class Lamp(MeshTarget):
     def status(self) -> LampStatus | None:
         """Last accepted cached status; does not send a Bluetooth query."""
         return self._mesh.get_status(self.destination)
+
+    def get_status(self, zone: int | None = None) -> LampStatus | None:
+        """Read the cached main status or a selected Dual Zone status."""
+        return self._mesh.get_status(self.destination, zone)
 
     async def request_status(self) -> None:
         """Send one status query and observe any response separately."""
@@ -324,33 +335,37 @@ class Lamp(MeshTarget):
         """Read PIR settings for this lamp; the protocol reply has no device address."""
         return await self._mesh.read_pir_settings(self.destination, timeout=timeout)
 
-    async def read_pir_luminosity(self, *, timeout: float = 15.0) -> int | None:
+    async def read_pir_luminosity_raw(self, *, timeout: float = 15.0) -> int | None:
         """Read the raw PIR luminosity value (0..255), not lux."""
-        return await self._mesh.read_pir_luminosity(self.destination, timeout=timeout)
+        return await self._mesh.read_pir_luminosity_raw(self.destination, timeout=timeout)
 
     async def set_dual_zone_power(self, zone: int, enabled: bool) -> None:
         """Set on/off for one zone on this lamp. Raw state 2 remains low-level."""
         await self._mesh.set_dual_zone_power(self.destination, zone, enabled)
 
-    async def set_dual_zone_brightness(self, zone: int, percent: int) -> None:
+    async def set_dual_zone_brightness_percent(self, zone: int, percent: int) -> None:
         """Set brightness percentage for a selected lamp zone."""
-        await self._mesh.set_dual_zone_brightness(self.destination, zone, percent)
+        await self._mesh.set_dual_zone_brightness_percent(self.destination, zone, percent)
 
-    async def set_dual_zone_brightness_native(self, zone: int, level: int) -> None:
+    async def set_dual_zone_brightness_raw(self, zone: int, level: int) -> None:
         """Set a native brightness value for a selected lamp zone."""
-        await self._mesh.set_dual_zone_brightness_native(self.destination, zone, level)
+        await self._mesh.set_dual_zone_brightness_raw(self.destination, zone, level)
 
     async def set_dual_zone_rgb(self, zone: int, red: int, green: int, blue: int) -> None:
         """Set RGB color for a selected lamp zone."""
         await self._mesh.set_dual_zone_rgb(self.destination, zone, red, green, blue)
 
-    async def set_dual_zone_color_native(self, zone: int, hue: int, saturation: int) -> None:
-        """Set native hue and saturation for a selected lamp zone."""
-        await self._mesh.set_dual_zone_color_native(self.destination, zone, hue, saturation)
+    async def set_dual_zone_hs_raw(self, zone: int, hue_raw: int, saturation_raw: int) -> None:
+        """Set raw hue 0..254 and saturation 0..255 for a lamp zone."""
+        await self._mesh.set_dual_zone_hs_raw(self.destination, zone, hue_raw, saturation_raw)
 
-    async def set_dual_zone_color_temperature(self, zone: int, kelvin: int) -> None:
+    async def set_dual_zone_hs(self, zone: int, hue_degrees: float, saturation_percent: float) -> None:
+        """Send hue in degrees (0..360) and saturation in percent (0..100) for a zone."""
+        await self._mesh.set_dual_zone_hs(self.destination, zone, hue_degrees, saturation_percent)
+
+    async def set_dual_zone_color_temperature_kelvin(self, zone: int, kelvin: int) -> None:
         """Set Kelvin color temperature for a selected lamp zone."""
-        await self._mesh.set_dual_zone_color_temperature(self.destination, zone, kelvin)
+        await self._mesh.set_dual_zone_color_temperature_kelvin(self.destination, zone, kelvin)
 
     async def set_dual_zone_color_temperature_mired(self, zone: int, mired: int) -> None:
         """Set mired color temperature for a selected lamp zone."""

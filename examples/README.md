@@ -57,13 +57,14 @@ settings.
 
 | Examples | What to check before running |
 | --- | --- |
-| 15 and 29 | Use a direct connection to read the target's group list. Example 15 replaces the whole list and controls the group. Example 29 writes back the observed list once and tracks the reply. It reads the list again after a matching reply arrives. |
+| 15 and 29 | Use a direct connection to read the target's group list. Example 15 connects directly to the lamp, replaces its whole list and controls the group. Example 29 writes back the observed list once and tracks the reply. It reads the list again after a matching reply arrives. |
 | 17 and 18 | Example 17 overwrites numbered scene slot 1. Example 18 changes the power-cut setting. Its custom scene is separate from numbered scenes. |
-| 19 and 20 | Example 19 sends one addressless PIR settings write. Example 20 sends clock and timezone commands and requires sufficient MTU. See [Time](../documentation/MODERN_MESH_EXTENSIONS.md#time). |
+| 19 and 20 | Example 19 connects directly to the PIR and sends one addressless settings write. Example 20 sends clock and timezone commands and requires sufficient MTU. See [Time](../documentation/MODERN_MESH_EXTENSIONS.md#time). |
 | 21–25 | Each script replaces and enables a stored routine after a successful initial read. To disable it in the example, set `enabled=False` for each record in that routine. |
 | 26–28 | Connect directly. Examples 26 and 27 change mesh credentials and may assign a new mesh ID. Example 28 sends a mesh removal command. See [Provisioning](../documentation/PROVISIONING.md) for the network key and factory login requirements. |
 
-Example 13 requires Dual-Zone hardware. Examples 08–12 send an explicit
+Set the APK model name in Examples 05, 06 and 14 for lamps that report the
+full-MAC `da.b` status layout. Example 13 requires Dual-Zone hardware. Examples 08–12 send an explicit
 `set_power(True)` before demonstrating a lighting command. The setting call
 on its own sends one command and adds no separate power write.
 

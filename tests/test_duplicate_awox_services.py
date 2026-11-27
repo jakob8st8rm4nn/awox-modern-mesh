@@ -1,7 +1,7 @@
 """Keep actual service instances intact when recognizing the login service."""
 from types import SimpleNamespace
 import unittest
-from awox.frames import SERVICE_UUID, PAIR_UUID, COMMAND_UUID
+from awox.frames import SERVICE_UUID, PAIR_UUID, COMMAND_UUID, NOTIFY_UUID
 from awox.authentication import Credentials
 from awox.connection import MeshConnection as MeshSession
 from awox.esphome_transport import _ESPHomeBleakTransportBase
@@ -38,6 +38,19 @@ class Transport(_ESPHomeBleakTransportBase):
 
 class DuplicateServiceTests(unittest.IsolatedAsyncioTestCase):
 
+    async def test_missing_or_separate_notify_stops_before_login(self):
+        login = service(PAIR_UUID, COMMAND_UUID)
+        notify = service(NOTIFY_UUID)
+        for services in ([login], [login, notify], [notify, login]):
+            with self.subTest(services=services):
+                transport = Transport(services)
+                mesh = MeshSession(transport, Credentials('mesh', 'pass'))
+                with self.assertRaisesRegex(MissingCharacteristic, 'pair/command/notify'):
+                    await mesh.connect()
+                self.assertEqual(transport.test_client.calls, [])
+                self.assertFalse(mesh.login_accepted)
+                await mesh.disconnect()
+
     async def test_pair_and_command_in_separate_instances_cannot_login(self):
         pair, command = (service(PAIR_UUID), service(COMMAND_UUID))
         for services in ([pair, command], [command, pair]):
@@ -53,13 +66,26 @@ class DuplicateServiceTests(unittest.IsolatedAsyncioTestCase):
 
 class ServiceSelectionTests(unittest.IsolatedAsyncioTestCase):
     async def test_actual_complete_instance_is_selected_in_both_orders(self):
-        complete = service(PAIR_UUID, COMMAND_UUID)
+        complete = service(PAIR_UUID, COMMAND_UUID, NOTIFY_UUID)
         other = service('00000000-0000-0000-0000-000000000001')
         for services in ([complete, other], [other, complete], [complete]):
             with self.subTest(order=services):
                 transport = Transport(services)
                 await transport.connect(lambda status: None)
                 found = await transport.discover_services()
-                self.assertTrue({PAIR_UUID, COMMAND_UUID}.issubset(found[SERVICE_UUID]))
+                self.assertEqual(found[SERVICE_UUID], {PAIR_UUID, COMMAND_UUID, NOTIFY_UUID})
                 self.assertIs(transport._resolve(COMMAND_UUID), complete.characteristics[1])
+                await transport.disconnect()
+
+    async def test_incomplete_instance_does_not_hide_complete_instance(self):
+        complete = service(PAIR_UUID, COMMAND_UUID, NOTIFY_UUID)
+        incomplete = service(PAIR_UUID, COMMAND_UUID)
+        for services in ([complete, incomplete], [incomplete, complete]):
+            with self.subTest(order=services):
+                transport = Transport(services)
+                await transport.connect(lambda status: None)
+                found = await transport.discover_services()
+                self.assertEqual(found[SERVICE_UUID], {PAIR_UUID, COMMAND_UUID, NOTIFY_UUID})
+                with self.assertRaises(MissingCharacteristic):
+                    transport._resolve(PAIR_UUID)
                 await transport.disconnect()

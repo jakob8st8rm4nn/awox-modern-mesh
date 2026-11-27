@@ -8,6 +8,9 @@ from types import SimpleNamespace
 from datetime import timedelta
 import unittest
 from unittest.mock import patch
+from email.message import Message
+from urllib.request import HTTPSHandler, build_opener
+from urllib.response import addinfourl
 
 from awox import Credentials, registered_model_code
 from awox.authentication import derive_session_key
@@ -136,6 +139,29 @@ class ExampleRuns(unittest.IsolatedAsyncioTestCase):
             await module.main()
         fresh_ms = (initial_time + 15) * 1000
         self.assertEqual(sent, [(0x29, fresh_ms), (0x30, fresh_ms, 7200)])
+
+    def test_cloud_example_stops_at_redirect(self):
+        path = Path(__file__).parents[1] / 'examples/app_01_cloud_account_read.py'
+        spec = importlib.util.spec_from_file_location('cloud_example', path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        seen_urls = []
+
+        class OfflineHTTPS(HTTPSHandler):
+            def https_open(self, request):
+                seen_urls.append(request.full_url)
+                headers = Message()
+                headers['Location'] = 'https://redirect.invalid/parse/login'
+                response = addinfourl(io.BytesIO(), headers, request.full_url, 302)
+                response.msg = 'Found'
+                return response
+
+        url = 'https://cloud.invalid/parse/login'
+        with patch.object(module, 'build_opener',
+                          side_effect=lambda handler: build_opener(handler, OfflineHTTPS())):
+            with self.assertRaisesRegex(RuntimeError, 'Cloud HTTP redirect refused'):
+                module.request_json(url, 'offline-installation', {}, 'dummy-token')
+        self.assertEqual(seen_urls, [url])
 
     async def test_all_29_examples_execute_offline(self):
         root = Path(__file__).parents[1] / 'examples'

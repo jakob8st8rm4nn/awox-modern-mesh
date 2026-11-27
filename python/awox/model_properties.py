@@ -213,6 +213,49 @@ def lookup_model_properties(name: str) -> tuple[str, ...] | None:
     return _PROFILES[profile] if profile is not None else None
 
 
+# APK 1.14.11: ca.h(0), ca.f and ca.g use the Dual Zone controls.
+_DUAL_ZONE_MODELS = frozenset({
+    "EDUAL-RGBTW-TW",
+    "EDUAL2G-RGBTW-TW",
+    "EDUAL-RGB2TW-2BT",
+})
+_DUAL_ZONE_WHITE_PROPERTIES = (
+    "dual_zone_power_state",
+    "dual_zone_brightness",
+    "dual_zone_temperature",
+)
+
+# ca.l sets the descriptor value read by DeviceControlActivity.x().
+_FIXED_WHITE_PICKER_PERCENTS = MappingProxyType({"EGLO-ZMB-RGB-W": 80})
+
+
+def lookup_dual_zone_properties(name: str, zone: int) -> tuple[str, ...] | None:
+    """Return the APK controls for zone 0 or 1 of a known Dual Zone model.
+
+    This describes the app's controls. Unsupported model names and zone
+    numbers return None.
+    """
+    if not isinstance(name, str) or name not in _DUAL_ZONE_MODELS:
+        return None
+    if type(zone) is not int or zone not in (0, 1):
+        return None
+    if zone == 0:
+        return _DUAL_ZONE_WHITE_PROPERTIES + ("dual_zone_color",)
+    return _DUAL_ZONE_WHITE_PROPERTIES
+
+
+def lookup_fixed_white_picker_percent(name: str) -> int | None:
+    """Return the fixed APK white-picker percentage for a known model."""
+    return _FIXED_WHITE_PICKER_PERCENTS.get(name) if isinstance(name, str) else None
+
+
+def _is_light_model_name(name: str) -> bool:
+    return bool(
+        {"white_brightness", "white_temperature", "color_brightness", "color"}
+        .intersection(lookup_model_properties(name) or ())
+    )
+
+
 def _is_light_model(model_lookup_code: bytes) -> bool | None:
     """APK v9.b.q(): registered lighting properties, not a name heuristic.
 
@@ -220,15 +263,5 @@ def _is_light_model(model_lookup_code: bytes) -> bool | None:
     generic-lamp fallback to an unidentified device's state bytes.
     """
     models = lookup_models_by_code(model_lookup_code)
-    classifications = {
-        bool(
-            {
-                "white_brightness",
-                "white_temperature",
-                "color_brightness",
-                "color",
-            }.intersection(lookup_model_properties(model.name) or ())
-        )
-        for model in models
-    }
+    classifications = {_is_light_model_name(model.name) for model in models}
     return classifications.pop() if len(classifications) == 1 else None

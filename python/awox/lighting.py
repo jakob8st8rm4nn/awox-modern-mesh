@@ -72,8 +72,8 @@ def hsv_to_native(hue: float, saturation: float) -> tuple[int, int]:
     This is the proven final encoder stage, separate from the Android/Skia
     RGB-to-HSV conversion used by the colour picker.
     """
-    if not 0 <= hue < 360 or not math.isfinite(hue):
-        raise ValueError("hue must be finite in 0..<360 degrees")
+    if not 0 <= hue <= 360 or not math.isfinite(hue):
+        raise ValueError("hue must be finite in 0..360 degrees")
     if not 0 <= saturation <= 1 or not math.isfinite(saturation):
         raise ValueError("saturation must be finite in 0..1")
     return (
@@ -277,7 +277,7 @@ def build_color_rgb(
 
 
 def _validate_mesh_id(mesh_id: int) -> None:
-    if not _valid_unicast_mesh_id(mesh_id):
+    if not is_valid_unicast_mesh_id(mesh_id):
         raise ValueError("mesh_id must be a confirmed individual (unicast) device ID")
 
 
@@ -307,7 +307,7 @@ def build_color_cycle_command(session_key: bytes, mesh_id: int, enabled: bool) -
     )
 
 
-from ._validation import _valid_unicast_mesh_id
+from ._validation import is_valid_unicast_mesh_id
 
 
 def quiet_mode(

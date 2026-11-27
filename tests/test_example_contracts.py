@@ -27,7 +27,7 @@ class ExampleContracts(unittest.TestCase):
     def test_examples_include_safeguards_and_demonstrations(self):
         features = {
             7: ('set_power(True)', 'set_power(False)', 'asyncio.sleep(2)'),
-            13: ('ZONE = 0', 'set_dual_zone_rgb(', 'enabled=True', 'enabled=False'),
+            13: ('ZONE = 0', 'set_dual_zone_hs(', 'enabled=True', 'enabled=False'),
             15: ('GROUP_DESTINATION = 0x8000', 'read_mesh_groups(', 'set_mesh_groups(',
                  'group.set_power(True)', 'group.set_power(False)'),
             18: ('POWER_CUT_MODE = "previous"', 'read_power_cut_mode(',

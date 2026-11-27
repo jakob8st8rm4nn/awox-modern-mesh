@@ -1,5 +1,6 @@
 """AwoX Modern Mesh protocol building blocks. Importing performs no I/O."""
 
+from ._validation import is_valid_unicast_mesh_id
 from .authentication import Credentials
 from .frames import Frame, ExtendedCommand, ExtendedNotification
 from .session import AwoXMeshSession, Receipt
@@ -51,6 +52,7 @@ from .timezone_rule import (
 from .model_registry import AwoXModel, lookup_model, scanned_model_name
 from .model_codes import lookup_models_by_code, registered_model_code
 from .model_properties import lookup_model_properties
+from .model_properties import lookup_dual_zone_properties, lookup_fixed_white_picker_percent
 
 from .clock import build_time, build_time_with_timezone
 from .crypto import aes_att_encryption, aes_att_decryption

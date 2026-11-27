@@ -5,6 +5,7 @@ from pathlib import Path
 import unittest
 
 from awox import lookup_model, lookup_model_properties, lookup_models_by_code
+from awox import lookup_dual_zone_properties, lookup_fixed_white_picker_percent
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -18,6 +19,22 @@ def apk_properties(version):
 
 
 class ModelPropertiesTests(unittest.TestCase):
+
+    def test_apk_zone_properties(self):
+        white = ("dual_zone_power_state", "dual_zone_brightness", "dual_zone_temperature")
+        for model in ("EDUAL-RGBTW-TW", "EDUAL2G-RGBTW-TW", "EDUAL-RGB2TW-2BT"):
+            with self.subTest(model=model):
+                self.assertEqual(lookup_dual_zone_properties(model, 0), white + ("dual_zone_color",))
+                self.assertEqual(lookup_dual_zone_properties(model, 1), white)
+                self.assertIsNone(lookup_dual_zone_properties(model, 2))
+                self.assertIsNone(lookup_dual_zone_properties(model, True))
+        self.assertIsNone(lookup_dual_zone_properties("EGLO-ZM-RGB-TW", 0))
+
+    def test_apk_fixed_white_picker_percent(self):
+        self.assertEqual(lookup_fixed_white_picker_percent("EGLO-ZMB-RGB-W"), 80)
+        self.assertIsNone(lookup_fixed_white_picker_percent("EGLO-ZM-RGB-W"))
+        self.assertIsNone(lookup_fixed_white_picker_percent("unknown"))
+
     def test_all_48_modern_properties_agree_in_both_original_apks(self):
         older = apk_properties('1.14.10')
         newer = apk_properties('1.14.11')

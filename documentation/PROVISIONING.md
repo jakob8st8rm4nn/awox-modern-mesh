@@ -9,6 +9,9 @@ the default name `unpaired`.
 
 ## High-level, APK-style workflow
 
+Use the direct session exclusively for provisioning until the attempt ends.
+Run other commands on that session only outside the provisioning attempt.
+
 ```python
 from awox import AwoXMeshSession, ProvisioningSettings
 

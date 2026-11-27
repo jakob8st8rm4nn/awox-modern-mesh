@@ -18,6 +18,7 @@ MESH_NAME = ""              # AwoX mesh name
 MESH_PASSWORD = ""          # AwoX mesh password
 LAMP_MAC = ""               # Target lamp Bluetooth MAC address
 MESH_ID = 0                 # Target lamp mesh ID (for example 0x1234)
+LAMP_MODEL = ""             # APK model name; required for full-MAC da.b status
 GATEWAY_MAC = LAMP_MAC      # BLE gateway in the same mesh; may differ from target
 
 
@@ -30,6 +31,7 @@ async def main():
             lambda: proxy.create_transport(GATEWAY_MAC),
             credentials,
             {MESH_ID: LAMP_MAC},
+            device_models={MESH_ID: LAMP_MODEL} if LAMP_MODEL else None,
         ) as mesh:
             lamp = mesh.lamp(MESH_ID)
             # Wait for a matching observation. It can arrive during the query write.

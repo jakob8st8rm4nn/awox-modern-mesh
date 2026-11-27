@@ -150,9 +150,9 @@ class MeshConnection:
                 finally:
                     self._connect_setup_pending = False
                 present = services.get(SERVICE_UUID, frozenset())
-                if not {PAIR_UUID, COMMAND_UUID}.issubset(present):
+                if not {PAIR_UUID, COMMAND_UUID, NOTIFY_UUID}.issubset(present):
                     raise MissingCharacteristic(
-                        "modern mesh pair/command characteristics not found"
+                        "modern mesh pair/command/notify characteristics not found"
                     )
                 random = self._random_bytes(8)
                 if not isinstance(random, (bytes, bytearray, memoryview)):

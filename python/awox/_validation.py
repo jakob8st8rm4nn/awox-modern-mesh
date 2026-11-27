@@ -27,8 +27,8 @@ def _validate_received_at(value):
     return value
 
 
-def _valid_unicast_mesh_id(value) -> bool:
-    """Individual device address; exclude the APK group range and broadcast."""
+def is_valid_unicast_mesh_id(value: object) -> bool:
+    """Return whether value is an individual mesh device ID."""
     return type(value) is int and 1 <= value <= 0xFFFE and not 0x8000 <= value <= 0x80FF
 
 

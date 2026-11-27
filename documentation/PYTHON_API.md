@@ -9,6 +9,14 @@ exceptions are logged and isolated from session processing. `lamp(id)` returns a
 `broadcast()` return typed `MeshTarget`. This enables method suggestions in
 editors such as Pylance.
 
+## Individual device addresses
+
+`awox.is_valid_unicast_mesh_id(value)` checks whether a value can identify an
+individual device. It accepts integers from `0x0001` to `0xFFFE`, excluding
+group addresses `0x8000`–`0x80FF`. Booleans, strings, and `None` return `False`.
+Use it to filter imported or discovered IDs before creating a session.
+It checks the address only and performs no Bluetooth I/O.
+
 ## Command naming
 
 | Prefix | Meaning |
@@ -24,10 +32,12 @@ the reply a method tracks.
 
 ## Lighting values
 
-Brightness percentages map 0–100% to protocol values 2–254. Native brightness
-accepts 1–255 for regular and Dual-Zone commands. Native color accepts hue
-0–254 and saturation 0–255. White temperature accepts 153–454 mired. Kelvin
-methods convert to mired.
+Brightness percentages map 0–100% to protocol values 2–254. Raw brightness
+accepts 1–255 for regular and Dual-Zone commands. `set_hs()` and
+`set_dual_zone_hs()` take hue in degrees from 0 through 360 inclusive and
+saturation in percent from 0 to 100. A 360° input encodes as raw hue 254.
+The `*_hs_raw()` methods take raw hue 0–254 and saturation 0–255. White temperature accepts 153–454 mired.
+The `*_color_temperature_kelvin()` methods convert Kelvin to mired.
 
 For ordinary lighting methods with a `transition` parameter, use an integer
 multiple of 100 ms from 0 to 6,553,500 ms. The default is 200 ms. Zero requests
@@ -38,6 +48,18 @@ Each ordinary lighting setter sends its own command. An application that
 requires a separate power command or spacing between writes supplies those
 steps explicitly.
 
+## Model metadata
+
+`lookup_dual_zone_properties(model_name, zone)` exposes the APK's controls
+for the two zones of known Dual Zone models. Zone 0 includes RGB, while both
+zones expose power, brightness and white temperature. An unsupported model
+or zone returns `None`.
+
+`lookup_fixed_white_picker_percent(model_name)` returns the APK's fixed
+white-picker setting for a known model (`80` for `EGLO-ZMB-RGB-W`) or
+`None`. The value describes the app's picker coordinate. Actual LED color
+temperature depends on the device.
+
 ## Status queries
 
 Use `await lamp.read_status()` to wait for a status result or
@@ -45,6 +67,57 @@ Use `await lamp.read_status()` to wait for a status result or
 the cache or callbacks. `await mesh.request_status(destination)` also accepts
 group and broadcast addresses. Use `awox.status.status_query(destination)`
 to build the same 0x0A frame without sending it.
+
+`read_status()` waits for the main lamp state (zone 0 on a Dual Zone lamp).
+It accepts `da.b`, `da.c` or the
+previously supported `da.d` layout. For `da.b`, supply the known APK model
+name when creating the session, for example
+`AwoXMeshSession(factory, credentials, {mesh_id: mac}, device_models={mesh_id: "EGLO-ZM-RGB-TW"})`.
+This layout carries the full MAC and leaves `LampStatus.product_code` as
+`None`. For compact `da.c` white status, `temperature_percent_raw` retains
+the received value. Values from 0 to 100 also yield an approximate Mired
+value through the APK's percentage conversion. For `da.c` and `da.d`, an
+unknown configured model name can fall back to an unambiguous lamp code in
+the packet. `da.d` always requires a recognized lamp
+code. The raw status remains available through `mesh.mesh_states` and
+`on_mesh_status`.
+
+Dual-Zone setters accept integer zone numbers 0 and 1.
+
+For a known Dual Zone model registered with `device_models`,
+`lamp.get_status(zone=0)` and `lamp.get_status(zone=1)` read the two cached
+zone states. `mesh.get_status(mesh_id, zone=...)` provides the same access.
+Omit `zone` or use `lamp.status` to read the main state. Both valid zone
+reports invoke `on_status`, including repeated observations, with
+`LampStatus.zone` set to 0 or 1. `StatusStore.on_change` only fires when
+its stored lamp state changes. For normal lamps `zone` is `None`. The raw frame preserves the received byte as `zone_raw`.
+For valid reports from known Dual Zone models, raw value 1 maps to zone 0
+and all other values map to zone 1, following the APK's state handling.
+Zone 1 exposes power, brightness and white temperature. Its
+color mode, color values and effect flags are unavailable (`None`).
+The typed cache keeps the last valid observation for each zone until it
+expires or the session closes. The raw cache may include newer frames that
+were rejected by the lamp model check.
+Use `mesh.mesh_states` to inspect the original `MeshStatusFrame`.
+Use `await lamp.request_status()` to send a fresh query separately.
+
+`LampStatus` keeps `brightness_raw`, `hs_raw` and
+`white_temperature_mired`. The `hs_raw` tuple contains the reported hue and saturation bytes. When
+both bytes are in the setter's range, use `set_hs_raw(*status.hs_raw)`.
+The computed `hs` tuple uses the units accepted by `set_hs(*status.hs)`.
+
+The status provides these computed properties:
+
+| Property | Value |
+| --- | --- |
+| `brightness_percent` | Integer 0–100 using the APK's clamped 2–254 conversion. |
+| `color_temperature_mired` | The same reported or derived value as `white_temperature_mired`. |
+| `color_temperature_kelvin` | The available white temperature, rounded to integer Kelvin. |
+| `hs` | Hue in degrees (0 up to 360) and saturation in percent (0–100). |
+| `rgb` | Three RGB values (0–255), calculated at full HSV value. Use the separate brightness field for dimming. |
+
+Unavailable color or white-temperature values return `None`. These properties
+are computed from the status already received.
 
 ## ACK-waiting convenience methods
 
@@ -162,21 +235,23 @@ where shown. No command is retried automatically.
 | Method | Writes / steps | Tracked reply | Return if observed / absent |
 | --- | --- | --- | --- |
 | `set_power()` | One control power write | None | `None` after write |
-| `set_brightness()` | One brightness write; percent conversion | None | `None` after write |
-| `set_brightness_native()` | One native-brightness write | None | `None` after write |
+| `set_brightness_percent()` | One brightness write; percent conversion | None | `None` after write |
+| `set_brightness_raw()` | One native-brightness write | None | `None` after write |
 | `set_rgb()` | One RGB-to-native color write | None | `None` after write |
-| `set_color_native()` | One native color write | None | `None` after write |
-| `set_color_temperature()` | Kelvin conversion and one white write | None | `None` after write |
+| `set_hs()` | One color write; hue in degrees and saturation in percent | None | `None` after write |
+| `set_hs_raw()` | One native color write | None | `None` after write |
+| `set_color_temperature_kelvin()` | Kelvin conversion and one white write | None | `None` after write |
 | `set_color_temperature_mired()` | One native mired white write | None | `None` after write |
 | `set_candle_mode()` | One effect write | None | `None` after write |
 | `set_color_cycle()` | One effect write | None | `None` after write |
 | `save_scene()` / `recall_scene()` | One scene write each | None | `None` after write |
 | `set_dual_zone_power()` | One 0x52-based zone power write | None | `None` after write |
-| `set_dual_zone_brightness()` | One 0x52-based zone percent brightness write | None | `None` after write |
-| `set_dual_zone_brightness_native()` | One 0x52-based zone native brightness write | None | `None` after write |
+| `set_dual_zone_brightness_percent()` | One 0x52-based zone percent brightness write | None | `None` after write |
+| `set_dual_zone_brightness_raw()` | One 0x52-based zone native brightness write | None | `None` after write |
 | `set_dual_zone_rgb()` | One 0x52-based zone RGB color write | None | `None` after write |
-| `set_dual_zone_color_native()` | One 0x52-based zone native color write | None | `None` after write |
-| `set_dual_zone_color_temperature()` | Kelvin converted to mired, one zone write | None | `None` after write |
+| `set_dual_zone_hs()` | One 0x52-based zone color write; hue in degrees and saturation in percent | None | `None` after write |
+| `set_dual_zone_hs_raw()` | One 0x52-based zone native color write | None | `None` after write |
+| `set_dual_zone_color_temperature_kelvin()` | Kelvin converted to mired, one zone write | None | `None` after write |
 | `set_dual_zone_color_temperature_mired()` | One zone mired write | None | `None` after write |
 | `set_mesh_groups()` | One 0x0C group write | Addressed 0x0C | `MeshGroupSetResponse` / `None` on timeout |
 | `write_mesh_groups()` | One 0x0C group write | None | `None` after write |
@@ -208,7 +283,7 @@ where shown. No command is retried automatically.
 | `read_schedule_part()` | One 0x35 routine query | Addressed 0x35 matching routine | `SchedulePart` / `None` on timeout |
 | `read_presence_simulator()` | One 0x3C routine 1 query | Addressed 0x3C matching routine | `PresenceRead` / `None` on timeout |
 | `read_pir_settings()` | One 0x12 query | Unaddressed 0x12 | `PirSettings` / `None` on timeout |
-| `read_pir_luminosity()` | One 0x13 query | Unaddressed 0x13 | raw byte / `None` on timeout (not lux) |
+| `read_pir_luminosity_raw()` | One 0x13 query | Unaddressed 0x13 | raw byte / `None` on timeout (not lux) |
 | `read_pair_response()` | One Pair1914 characteristic read | GATT read, not a notification | Raw `bytes`; GATT failure propagates |
 
 Use a direct connection to the target lamp when reading its group list for a

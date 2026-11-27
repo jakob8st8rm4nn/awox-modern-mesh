@@ -6,6 +6,12 @@ for response and timeout contracts, and [Provisioning](PROVISIONING.md) for
 device enrollment. The pure codecs build or decode bytes without BLE I/O.
 Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#lighting-values).
 
+## Address validation
+
+| Function | Meaning |
+| --- | --- |
+| `awox.is_valid_unicast_mesh_id(value: object) -> bool` | Check an individual device ID. Rejects non-integers, factory ID `0`, group addresses `0x8000`–`0x80FF`, and broadcast `0xFFFF`. |
+
 ## Session and targets
 
 ### AwoXMeshSession
@@ -15,7 +21,7 @@ Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#li
 | `broadcast(self) -> 'MeshTarget'` | Explicit FFFF write target; never aggregates received status. |
 | `connect(self, *, timeout: 'float' = 30.0) -> 'None'` | Perform a single BLE/session/login attempt; propagate actual failures. |
 | `disconnect(self) -> 'None'` | Interrupt any in-progress connect, then close the current session. |
-| `get_status(self, mesh_id)` | Return a cached lamp status while connected, subject to the age filter. |
+| `get_status(self, mesh_id, zone=None)` | Return a cached lamp status while connected, subject to the age filter. |
 | `group(self, destination: 'int') -> 'MeshTarget'` | Explicit non-lamp target; address classification is caller-owned. |
 | `lamp(self, mesh_id: 'int') -> 'Lamp'` | Return a target for an individually registered mesh ID. |
 | `provision(self, mesh_id: 'int', settings: 'provisioning.ProvisioningSettings', *, groups: 'list[int] \| tuple[int, ...] \| None' = None, timeout: 'float' = 20.0, provisioning_byte: 'int \| None' = None) -> 'provisioning.ProvisioningResult'` | Direct setup: optional 0x0C, Pair04/05, Pair07, then 0x03/0x04 and 0x83 observation on the standard path. |
@@ -23,7 +29,7 @@ Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#li
 | `read_mesh_groups(self, destination, *, timeout=15.0)` | Read the full current membership list, never replay across reconnects. |
 | `read_nightlight(self, destination, *, timeout: 'float' = 15.0)` | Read-only APK 0x35 routines 5 and (if valid first reply) 6. |
 | `read_pair_response(self)` | Read the current connection's Pair1914 response. |
-| `read_pir_luminosity(self, destination, *, timeout=15.0)` | 0x13 addressed query; returns raw 0..255 or None, not lux. |
+| `read_pir_luminosity_raw(self, destination, *, timeout=15.0)` | 0x13 addressed query; returns raw 0..255 or None, not lux. |
 | `read_pir_settings(self, destination, *, timeout=15.0)` | 0x12 addressed query; reply has no source address or request ID. |
 | `read_power_cut_mode(self, destination, *, timeout=15.0)` | Read a stored configuration on this *current* mesh connection. |
 | `read_presence_simulator(self, destination, *, timeout=15.0)` | Read-only APK 0x3C presence simulator, routine 1, once. |
@@ -36,10 +42,11 @@ Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#li
 | `send(self, frame: 'ExtendedCommand')` | Send one caller-built frame without waiting for a device response. |
 | `send_and_track_reply(self, frame, opcode, *, target=None, routine=None, timeout=15.0, factory=False) -> 'Receipt'` | Send once and retain a bounded response window without awaiting it. |
 | `set_dawn_simulator(self, destination, start, end, *, timeout: 'float' = 15.0)` | Write APK routines 7/8; MAY change persistent lamp automation. |
-| `set_dual_zone_brightness(self, destination, zone, percent) -> 'None'` | Write a dual-zone brightness percentage using the existing encoder. |
-| `set_dual_zone_brightness_native(self, destination, zone, level) -> 'None'` | Write a dual-zone brightness value in the encoder's native range. |
-| `set_dual_zone_color_native(self, destination, zone, hue, saturation) -> 'None'` | Send dual-zone native hue and saturation values without RGB conversion. |
-| `set_dual_zone_color_temperature(self, destination, zone, kelvin) -> 'None'` | Convert Kelvin to mired and send one dual-zone temperature command. |
+| `set_dual_zone_brightness_percent(self, destination, zone, percent) -> 'None'` | Write a dual-zone brightness percentage using the existing encoder. |
+| `set_dual_zone_brightness_raw(self, destination, zone, level) -> 'None'` | Write a dual-zone brightness value in the encoder's native range. |
+| `set_dual_zone_hs(destination, zone, hue_degrees, saturation_percent)` | Set zone hue in degrees and saturation in percent. |
+| `set_dual_zone_hs_raw(self, destination, zone, hue_raw, saturation_raw) -> 'None'` | Send dual-zone native hue and saturation values without RGB conversion. |
+| `set_dual_zone_color_temperature_kelvin(self, destination, zone, kelvin) -> 'None'` | Convert Kelvin to mired and send one dual-zone temperature command. |
 | `set_dual_zone_color_temperature_mired(self, destination, zone, mired) -> 'None'` | Send a dual-zone temperature command using a mired value directly. |
 | `set_dual_zone_power(self, destination: 'int', zone: 'int', enabled: 'bool') -> 'None'` | Write dual-zone power using a Boolean on/off value. |
 | `set_dual_zone_rgb(self, destination, zone, red, green, blue) -> 'None'` | Convert RGB to the dual-zone native color representation and send once. |
@@ -64,12 +71,19 @@ Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#li
 
 ### Lamp
 
+`get_status(zone: int | None = None) -> LampStatus | None` reads cached status.
+Omit `zone` for the main state, or use zone 0 or 1 for a Dual Zone model
+registered via `device_models`. Dual-Zone setters also accept integer zones
+0 and 1. Zone 1 exposes power, brightness and white temperature.
+Missing or expired observations return `None`. Use
+`request_status()` to send a query separately.
+
 | Method | Meaning |
 | --- | --- |
 | `read_dawn_simulator(self, *, timeout: 'float' = 15.0)` | Read-only APK 0x35 routines 7 and (if valid first reply) 8. |
 | `read_mesh_groups(self, *, timeout=15.0)` | Read group membership with one addressed 0x08 query. Use a direct connection for backups or before writing membership back. |
 | `read_nightlight(self, *, timeout: 'float' = 15.0)` | Read-only APK 0x35 routines 5 and (if valid first reply) 6. |
-| `read_pir_luminosity(self, *, timeout: 'float' = 15.0)` | Read the raw PIR luminosity value (0..255), not lux. |
+| `read_pir_luminosity_raw(self, *, timeout: 'float' = 15.0)` | Read the raw PIR luminosity value (0..255), not lux. |
 | `read_pir_settings(self, *, timeout: 'float' = 15.0)` | Read PIR settings for this lamp; the protocol reply has no device address. |
 | `read_power_cut_mode(self, *, timeout=15.0)` | Read the stored power-cut mode, without changing the setting. |
 | `read_presence_simulator(self, *, timeout=15.0)` | Read-only APK 0x3C presence simulator, routine 1, once. |
@@ -80,18 +94,20 @@ Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#li
 | `read_timer(self, *, timeout: 'float' = 15.0)` | Read-only APK countdown timer (0x35, routine 2), once. |
 | `recall_scene(self, index: 'int') -> 'None'` | Recall native scene index 0..255 (APK selector 05), one write. |
 | `save_scene(self, index: 'int') -> 'None'` | Save current state to native scene index 0..255 (APK selector 04). |
-| `set_brightness(self, percent: 'int', *, transition: 'int' = 200) -> 'None'` | Set 0..100%; transition is in milliseconds (default 200). |
-| `set_brightness_native(self, level: 'int', *, transition: 'int' = 200) -> 'None'` | Send native brightness 1..255; transition in milliseconds (default 200). |
+| `set_brightness_percent(self, percent: 'int', *, transition: 'int' = 200) -> 'None'` | Set 0..100%; transition is in milliseconds (default 200). |
+| `set_brightness_raw(self, level: 'int', *, transition: 'int' = 200) -> 'None'` | Send native brightness 1..255; transition in milliseconds (default 200). |
 | `set_candle_mode(self, enabled: 'bool') -> 'None'` | APK set_candle_mode: one effect write, no automatic power-on. |
 | `set_color_cycle(self, enabled: 'bool') -> 'None'` | APK color_sequence_colors: one start/stop write, no implicit extras. |
-| `set_color_native(self, hue: 'int', saturation: 'int', *, transition: 'int' = 200) -> 'None'` | Set native HSV; transition in milliseconds (default 200). |
-| `set_color_temperature(self, kelvin: 'int', *, transition: 'int' = 200) -> 'None'` | Set Kelvin; transition in milliseconds (default 200). |
+| `set_hs(hue_degrees, saturation_percent, *, transition=200)` | Set hue in degrees and saturation in percent. |
+| `set_hs_raw(self, hue_raw: 'int', saturation_raw: 'int', *, transition: 'int' = 200) -> 'None'` | Set raw hue and saturation; transition in milliseconds (default 200). |
+| `set_color_temperature_kelvin(self, kelvin: 'int', *, transition: 'int' = 200) -> 'None'` | Set Kelvin; transition in milliseconds (default 200). |
 | `set_color_temperature_mired(self, mired: 'int', *, transition: 'int' = 200) -> 'None'` | Send 153..454 mired; transition in milliseconds (default 200). |
 | `set_dawn_simulator(self, start, end, *, timeout: 'float' = 15.0)` | Write APK routines 7/8; MAY change persistent lamp automation. |
-| `set_dual_zone_brightness(self, zone: 'int', percent: 'int') -> 'None'` | Set brightness percentage for a selected lamp zone. |
-| `set_dual_zone_brightness_native(self, zone: 'int', level: 'int') -> 'None'` | Set a native brightness value for a selected lamp zone. |
-| `set_dual_zone_color_native(self, zone: 'int', hue: 'int', saturation: 'int') -> 'None'` | Set native hue and saturation for a selected lamp zone. |
-| `set_dual_zone_color_temperature(self, zone: 'int', kelvin: 'int') -> 'None'` | Set Kelvin color temperature for a selected lamp zone. |
+| `set_dual_zone_brightness_percent(self, zone: 'int', percent: 'int') -> 'None'` | Set brightness percentage for a selected lamp zone. |
+| `set_dual_zone_brightness_raw(self, zone: 'int', level: 'int') -> 'None'` | Set a native brightness value for a selected lamp zone. |
+| `set_dual_zone_hs(zone, hue_degrees, saturation_percent)` | Set zone hue in degrees and saturation in percent. |
+| `set_dual_zone_hs_raw(self, zone: 'int', hue_raw: 'int', saturation_raw: 'int') -> 'None'` | Set native hue and saturation for a selected lamp zone. |
+| `set_dual_zone_color_temperature_kelvin(self, zone: 'int', kelvin: 'int') -> 'None'` | Set Kelvin color temperature for a selected lamp zone. |
 | `set_dual_zone_color_temperature_mired(self, zone: 'int', mired: 'int') -> 'None'` | Set mired color temperature for a selected lamp zone. |
 | `set_dual_zone_power(self, zone: 'int', enabled: 'bool') -> 'None'` | Set on/off for one zone on this lamp. Raw state 2 remains low-level. |
 | `set_dual_zone_rgb(self, zone: 'int', red: 'int', green: 'int', blue: 'int') -> 'None'` | Set RGB color for a selected lamp zone. |
@@ -114,12 +130,13 @@ Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#li
 | --- | --- |
 | `recall_scene(self, index: 'int') -> 'None'` | Recall native scene index 0..255 (APK selector 05), one write. |
 | `save_scene(self, index: 'int') -> 'None'` | Save current state to native scene index 0..255 (APK selector 04). |
-| `set_brightness(self, percent: 'int', *, transition: 'int' = 200) -> 'None'` | Set 0..100%; transition is in milliseconds (default 200). |
-| `set_brightness_native(self, level: 'int', *, transition: 'int' = 200) -> 'None'` | Send native brightness 1..255; transition in milliseconds (default 200). |
+| `set_brightness_percent(self, percent: 'int', *, transition: 'int' = 200) -> 'None'` | Set 0..100%; transition is in milliseconds (default 200). |
+| `set_brightness_raw(self, level: 'int', *, transition: 'int' = 200) -> 'None'` | Send native brightness 1..255; transition in milliseconds (default 200). |
 | `set_candle_mode(self, enabled: 'bool') -> 'None'` | APK set_candle_mode: one effect write, no automatic power-on. |
 | `set_color_cycle(self, enabled: 'bool') -> 'None'` | APK color_sequence_colors: one start/stop write, no implicit extras. |
-| `set_color_native(self, hue: 'int', saturation: 'int', *, transition: 'int' = 200) -> 'None'` | Set native HSV; transition in milliseconds (default 200). |
-| `set_color_temperature(self, kelvin: 'int', *, transition: 'int' = 200) -> 'None'` | Set Kelvin; transition in milliseconds (default 200). |
+| `set_hs(hue_degrees, saturation_percent, *, transition=200)` | Set hue in degrees and saturation in percent. |
+| `set_hs_raw(self, hue_raw: 'int', saturation_raw: 'int', *, transition: 'int' = 200) -> 'None'` | Set raw hue and saturation; transition in milliseconds (default 200). |
+| `set_color_temperature_kelvin(self, kelvin: 'int', *, transition: 'int' = 200) -> 'None'` | Set Kelvin; transition in milliseconds (default 200). |
 | `set_color_temperature_mired(self, mired: 'int', *, transition: 'int' = 200) -> 'None'` | Send 153..454 mired; transition in milliseconds (default 200). |
 | `set_power(self, enabled: 'bool') -> 'None'` | Send exactly one on/off control; never wait for a device ACK. |
 | `set_rgb(self, red: 'int', green: 'int', blue: 'int', *, transition: 'int' = 200) -> 'None'` | Set RGB; transition is in milliseconds (default 200). |
@@ -196,6 +213,13 @@ Lighting ranges, units and fade limits are in [Lighting values](PYTHON_API.md#li
 | `set(destination: 'int', property_name: 'str', value, *, transition: 'int' = 200) -> 'ExtendedCommand'` | Encode an immediate property write; transition in milliseconds. |
 | `temperature_payload_mired(mired: 'int', *, transition: 'int' = 200) -> 'bytes'` | Encode white temperature; transition is in milliseconds (default 200). |
 | `transition_bytes(transition: 'int' = 200) -> 'bytes'` | Encode transition in milliseconds, little-endian 100-ms units. |
+
+## Model metadata
+
+| Function | Behavior |
+| --- | --- |
+| `lookup_dual_zone_properties(name: str, zone: int) -> tuple[str, ...] \| None` | Return the APK controls for zone 0 or 1 of a known Dual Zone model. |
+| `lookup_fixed_white_picker_percent(name: str) -> int \| None` | Return the APK's fixed white-picker setting in percent when known. |
 
 ## status
 

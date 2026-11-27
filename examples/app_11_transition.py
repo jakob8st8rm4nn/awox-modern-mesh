@@ -36,12 +36,12 @@ async def main():
             print("Lamp ON command sent for observation.")
 
             # Establish a visible starting point without a fade.
-            await lamp.set_brightness(10, transition=0)
+            await lamp.set_brightness_percent(10, transition=0)
             print("Starting brightness: 10% (no fade).")
             await asyncio.sleep(2)
 
             # transition is in milliseconds, in 100-ms steps; default is 200.
-            await lamp.set_brightness(90, transition=3000)
+            await lamp.set_brightness_percent(90, transition=3000)
             print("Requested fade: 10% -> 90% over three seconds.")
             await asyncio.sleep(4)  # Observe the fade; this is not an ACK.
 

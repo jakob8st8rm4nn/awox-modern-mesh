@@ -96,7 +96,7 @@ class AdvertisementMacHueTests(unittest.TestCase):
         self.assertEqual(received.light_state.hue_raw, 255)
 
     def test_status_hue_ff_is_only_raw_no_derived_angle(self):
-        # Status exposes hue_raw, not a converted hue_degrees property.
+        # LampStatus preserves the raw hue byte even when conversion is unavailable.
         # Retain original bytes for diagnostics; do not invent a fixed angle.
         payload = (bytes.fromhex('DD 9C 01 00 00 96 20 01 EE DD CC')
                    + bytes((1, 7, 138)) + b'\xff\xff' + bytes((255, 254, 0x60)))
@@ -105,7 +105,8 @@ class AdvertisementMacHueTests(unittest.TestCase):
         status = parse_lamp_status(packet, received_at=1.0)
         self.assertIsNotNone(status)
         self.assertTrue(status.color_cycle_active)
-        self.assertEqual(status.hue_raw, 255)
+        self.assertEqual(status.hs_raw[0], 255)
+        self.assertIsNone(status.hs)
         self.assertFalse(hasattr(status, 'hue_degrees'))
 
     def test_defined_hue_boundary_still_interpreted(self):

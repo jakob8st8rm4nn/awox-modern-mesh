@@ -4,6 +4,7 @@ WARNING: set_mesh_groups REPLACES the lamp's complete stored group list;
 it can remove existing App memberships. Choose GROUP_DESTINATION deliberately.
 The previous list is printed, not restored. Other existing group members
 receive the same group commands. A GATT write is not a per-member ACK.
+Connect directly to the lamp whose groups are being changed.
 No broadcast or scene write is performed.
 """
 
@@ -17,7 +18,6 @@ MESH_NAME = ""              # AwoX mesh name
 MESH_PASSWORD = ""          # AwoX mesh password
 LAMP_MAC = ""               # Target lamp Bluetooth MAC address
 MESH_ID = 0                 # Target lamp mesh ID (for example 0x1234)
-GATEWAY_MAC = LAMP_MAC      # BLE gateway in the same mesh; may differ from target
 
 GROUP_DESTINATION = 0x8000  # Choose an actual group address from your mesh.
 
@@ -28,7 +28,7 @@ async def main():
     credentials = Credentials(MESH_NAME, MESH_PASSWORD)
     async with ESPHomeProxy(PROXY_HOST, PROXY_KEY) as proxy:
         async with AwoXMeshSession(
-            lambda: proxy.create_transport(GATEWAY_MAC),
+            lambda: proxy.create_transport(LAMP_MAC),
             credentials,
             {MESH_ID: LAMP_MAC},
         ) as mesh:

@@ -17,15 +17,18 @@ Keep its output private because some fields identify accounts and devices.
 [Example 02](../examples/app_02_bluetooth_discovery.py) discovers devices and
 [Example 03](../examples/app_03_advertisement_monitor.py) observes their
 advertisements. An advertisement may be short or omit the mesh ID.
-`mesh_address_unsigned` gives the 16-bit address when present. For a live
-device report, use a status query after connecting.
+`mesh_address_unsigned` gives the 16-bit address when present. Use
+`awox.is_valid_unicast_mesh_id()` to check it before registering an individual
+device. For a live device report, use a status query after connecting.
 
 ## Connect and read a lamp
 
 Run [Example 06](../examples/app_06_read_status.py) with your settings. An
 `AwoXMeshSession` takes a transport factory for the Bluetooth gateway you
 choose and a mapping of target mesh IDs to Bluetooth MACs. The mapping lets
-the session associate status replies with known devices.
+the session associate status replies with known devices. Provide the APK
+model name in `device_models` when the lamp reports the full-MAC `da.b`
+layout, which carries no model code.
 
 The gateway can be the lamp itself or a reachable device in the same mesh.
 Use a direct connection when reading group membership for a backup or as a

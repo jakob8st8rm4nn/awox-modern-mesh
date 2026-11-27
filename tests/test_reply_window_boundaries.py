@@ -322,14 +322,14 @@ class ReplyWindowBoundaries(unittest.IsolatedAsyncioTestCase):
             )
             with patch('awox.session.parse_status_variant', wraps=parse_status_variant) as decode:
                 transport.emit(0x82, compact)
-                self.assertEqual(mesh.mesh_states, {})
+                self.assertEqual(set(mesh.mesh_states), {(ID + 1, 1)})
                 transport.emit(0x82, full)
                 transport.emit(0x82, ordinary)
                 self.assertEqual(decode.call_count, 3)
 
             self.assertEqual((await first.wait()).payload, ordinary)
-            self.assertEqual((await second.wait()).payload, full)
-            self.assertEqual(set(mesh.mesh_states), {(ID, 1), (ID + 1, 2)})
+            self.assertEqual((await second.wait()).payload, compact)
+            self.assertEqual(set(mesh.mesh_states), {(ID, 1), (ID + 1, 1), (ID + 1, 2)})
 
     async def test_active_lamp_status_uses_same_mac_tail_as_passive_observation(self):
         lamp = bytes.fromhex('34120100009620332211380101800000006000')
@@ -353,7 +353,7 @@ class ReplyWindowBoundaries(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(result.raw_response, b'\x82' + lamp)
             self.assertEqual(mesh.get_status(ID).raw_response, result.raw_response)
             self.assertEqual(len(notifications), 1)
-            self.assertEqual(mesh.mesh_states, {})
+            self.assertEqual(mesh.mesh_states[(ID, 1)].raw_response, result.raw_response)
 
     async def test_lamp_read_waits_past_raw_status_for_lamp_layout(self):
         full = bytes.fromhex('341202010033221138c1a40101800000000060')

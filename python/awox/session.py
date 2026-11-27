@@ -21,7 +21,10 @@ from .authentication import Credentials
 from .connection import MeshConnection
 from .frames import ExtendedCommand, ExtendedNotification, control
 from . import lighting, groups, power_cut, schedule, presence, pir, provisioning, clock
-from .status import StatusStore, LampStatus, MeshStatusFrame, parse_status_variant, status_query
+from .status import (
+    StatusStore, LampStatus, MeshStatusFrame,
+    parse_status_variant, status_query,
+)
 from .transport import GattTransport, ConnectionLost, _observe_task_result
 from .targets import Lamp, MeshTarget
 
@@ -181,11 +184,18 @@ class Receipt:
             self._release()
 
 
+def _validate_zone(zone: int) -> None:
+    if type(zone) is not int or zone not in (0, 1):
+        raise ValueError("zone must be 0 or 1")
+
+
 class AwoXMeshSession:
     """Explicit gateway session; construction has no I/O.
 
     devices maps known individual mesh IDs to MAC addresses for conservative
     status identity checks. It is optional for factory/provisioning operations.
+    device_models optionally maps those IDs to APK model names for status
+    layouts that do not identify the model.
     """
 
     def __init__(
@@ -194,6 +204,7 @@ class AwoXMeshSession:
         credentials: Credentials,
         devices: Mapping[int, str] | None = None,
         *,
+        device_models: Mapping[int, str] | None = None,
         on_status: Callable[[LampStatus], None] | None = None,
         on_mesh_status: Callable[[MeshStatusFrame], None] | None = None,
         on_notification: Callable[[ExtendedNotification], None] | None = None,
@@ -211,8 +222,9 @@ class AwoXMeshSession:
                 raise TypeError("callbacks must be callable or None")
         self._transport_factory, self._credentials = transport_factory, credentials
         self._devices = dict(devices or {})
-        self._statuses = StatusStore(self._devices)
+        self._statuses = StatusStore(self._devices, device_models=device_models)
         self._mesh_statuses = {}
+        self._secondary_zone_statuses: dict[int, LampStatus] = {}
         self._on_status, self._on_mesh_status = on_status, on_mesh_status
         self._on_notification, self._on_disconnect = on_notification, on_disconnect
         self._status_max_age = status_max_age
@@ -245,6 +257,7 @@ class AwoXMeshSession:
     def _clear_observations(self):
         self._statuses.clear()
         self._mesh_statuses.clear()
+        self._secondary_zone_statuses.clear()
         self.last_quiet_result_code = self.last_dual_zone_result_code = None
         for receipt in tuple(self._receipts):
             receipt._invalidated = True
@@ -278,12 +291,9 @@ class AwoXMeshSession:
         try:
             received_at = asyncio.get_running_loop().time()
             is_status = notification.opcode in (0x80, 0x82)
-            raw_status = parse_status_variant(notification) if is_status else None
-            if raw_status is not None:
-                # The APK supplies A4:C1 for compact formats before lookup.
-                expected_mac = self._devices.get(raw_status.mesh_id, "")
-                if raw_status.mac_address != expected_mac.upper():
-                    raw_status = None
+            raw_status = parse_status_variant(notification, received_at=received_at) if is_status else None
+            if raw_status is not None and not self._statuses._matches_identity(raw_status):
+                raw_status = None
             for receipt in tuple(self._receipts):
                 if receipt._future.done():
                     continue
@@ -309,11 +319,15 @@ class AwoXMeshSession:
                 break
             if is_status:
                 if raw_status is not None:
-                    self._mesh_statuses[(raw_status.mesh_id, raw_status.endpoint)] = raw_status
+                    self._mesh_statuses[(raw_status.mesh_id, raw_status.zone_raw)] = raw_status
                     self._callback(self._on_mesh_status, raw_status)
-                observed, _ = self._statuses.observe(notification)
-                if observed is not None:
-                    self._callback(self._on_status, observed)
+                    state = self._statuses._lamp_view(raw_status, include_secondary=True)
+                    if state is not None:
+                        if state.zone == 1:
+                            self._secondary_zone_statuses[state.mesh_id] = state
+                        else:
+                            self._statuses._observe_lamp(state)
+                        self._callback(self._on_status, state)
             elif notification.opcode == 0x0B and len(notification.payload) >= 2:
                 attempt = self._provision_attempt
                 if attempt is not None and self._connection is attempt.connection:
@@ -337,7 +351,7 @@ class AwoXMeshSession:
 
     @property
     def mesh_states(self) -> dict[tuple[int, int], MeshStatusFrame]:
-        """Per-device/endpoint raw Modern status, independent of the lamp cache."""
+        """Raw Modern status keyed by (mesh_id, zone_raw), independent of the lamp cache."""
         if not self.connected:
             return {}
         return {k: v for k, v in self._mesh_statuses.items() if self._fresh(v)}
@@ -348,15 +362,25 @@ class AwoXMeshSession:
             or time.monotonic() - status.received_monotonic <= self._status_max_age
         )
 
-    def get_status(self, mesh_id: int) -> LampStatus | None:
+    def get_status(self, mesh_id: int, zone: int | None = None) -> LampStatus | None:
         """Return a cached lamp status while connected, subject to the age filter.
 
-        No Bluetooth request is sent; use read_status() for an active query.
+        Omit zone for the main status, or select zone 0 or 1 for a Dual Zone lamp.
+        Use read_status() for an active query.
         """
         if type(mesh_id) is not int:
             raise TypeError("mesh_id must be an integer")
-        status = self._statuses.get(mesh_id) if self.connected else None
-        return status if status is not None and self._fresh(status) else None
+        if zone is not None:
+            _validate_zone(zone)
+        if not self.connected:
+            return None
+        if zone == 1:
+            status = self._secondary_zone_statuses.get(mesh_id)
+        else:
+            status = self._statuses.get(mesh_id)
+        if status is None or (zone == 0 and status.zone != 0) or not self._fresh(status):
+            return None
+        return status
 
     def lamp(self, mesh_id: int) -> Lamp:
         """Return a target for an individually registered mesh ID.
@@ -841,7 +865,7 @@ class AwoXMeshSession:
             lambda reply: pir.PirSettings.decode(reply[1:10]), timeout=timeout,
         )
 
-    async def read_pir_luminosity(self, destination: int, *, timeout: float = 15.0) -> int | None:
+    async def read_pir_luminosity_raw(self, destination: int, *, timeout: float = 15.0) -> int | None:
         """0x13 addressed query; returns raw 0..255 or None, not lux."""
         # A short reply raises IndexError in the decoder and is not consumed.
         return await self._read(
@@ -871,25 +895,37 @@ class AwoXMeshSession:
         """
         if type(enabled) is not bool:
             raise TypeError("enabled must be bool; raw 0/1/2 is available in lighting.dual_zone_power")
+        _validate_zone(zone)
         await self.send(lighting.dual_zone_power(destination, int(enabled), zone))
 
-    async def set_dual_zone_brightness(self, destination: int, zone: int, percent: int) -> None:
+    async def set_dual_zone_brightness_percent(self, destination: int, zone: int, percent: int) -> None:
         """Write a dual-zone brightness percentage using the existing encoder."""
+        _validate_zone(zone)
         await self.send(lighting.dual_zone_brightness(destination, zone, percent))
 
-    async def set_dual_zone_brightness_native(self, destination: int, zone: int, level: int) -> None:
+    async def set_dual_zone_brightness_raw(self, destination: int, zone: int, level: int) -> None:
         """Write a dual-zone brightness value in the encoder's native range."""
+        _validate_zone(zone)
         await self.send(lighting.dual_zone_brightness_native(destination, zone, level))
 
     async def set_dual_zone_rgb(self, destination: int, zone: int, red: int, green: int, blue: int) -> None:
         """Convert RGB to the dual-zone native color representation and send once."""
+        _validate_zone(zone)
         await self.send(lighting.dual_zone_color(destination, zone, red, green, blue))
 
-    async def set_dual_zone_color_native(self, destination: int, zone: int, hue: int, saturation: int) -> None:
-        """Send dual-zone native hue and saturation values without RGB conversion."""
-        await self.send(lighting.dual_zone_color_native(destination, zone, hue, saturation))
+    async def set_dual_zone_hs_raw(self, destination: int, zone: int, hue_raw: int, saturation_raw: int) -> None:
+        """Send raw hue 0..254 and saturation 0..255 for a lamp zone."""
+        _validate_zone(zone)
+        await self.send(lighting.dual_zone_color_native(destination, zone, hue_raw, saturation_raw))
 
-    async def set_dual_zone_color_temperature(self, destination: int, zone: int, kelvin: int) -> None:
+    async def set_dual_zone_hs(
+        self, destination: int, zone: int, hue_degrees: float, saturation_percent: float
+    ) -> None:
+        """Send hue in degrees (0..360) and saturation in percent (0..100) for a zone."""
+        hue, saturation = lighting.hsv_to_native(hue_degrees, saturation_percent / 100)
+        await self.set_dual_zone_hs_raw(destination, zone, hue, saturation)
+
+    async def set_dual_zone_color_temperature_kelvin(self, destination: int, zone: int, kelvin: int) -> None:
         """Convert Kelvin to mired and send one dual-zone temperature command."""
         await self.set_dual_zone_color_temperature_mired(
             destination, zone, lighting.mired_from_kelvin(kelvin)
@@ -897,6 +933,7 @@ class AwoXMeshSession:
 
     async def set_dual_zone_color_temperature_mired(self, destination: int, zone: int, mired: int) -> None:
         """Send a dual-zone temperature command using a mired value directly."""
+        _validate_zone(zone)
         await self.send(lighting.dual_zone_temperature_mired(destination, zone, mired))
 
     async def set_time(self, unix_milliseconds: int, offset_seconds: int) -> None:
@@ -964,6 +1001,7 @@ class AwoXMeshSession:
 
         Use a session connected directly to the *factory device*. The caller
         must supply its current login credentials and advertising metadata.
+        Use this direct session exclusively for provisioning until the attempt ends.
         A known 0xA0 provisioning byte skips 03/04 as in the observed APK.
         An unobserved 0x83 yields completed=False; it is NOT safe to retry
         automatically. ``timeout`` (seconds, default 20; max 60) limits only

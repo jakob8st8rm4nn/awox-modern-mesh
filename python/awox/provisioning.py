@@ -140,9 +140,9 @@ class ProvisioningResult:
 
 def remove_from_mesh(destination: int) -> ExtendedCommand:
     """APK i9.g.c: explicit kick-out query, not a proven full factory reset."""
-    if not _valid_unicast_mesh_id(destination):
+    if not is_valid_unicast_mesh_id(destination):
         raise ValueError("device address must be a confirmed individual device ID")
     return addressed_query(destination, 0x01)
 
 
-from ._validation import _valid_unicast_mesh_id
+from ._validation import is_valid_unicast_mesh_id

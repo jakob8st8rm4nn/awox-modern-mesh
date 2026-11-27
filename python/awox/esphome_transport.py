@@ -185,13 +185,13 @@ class _ESPHomeBleakTransportBase:
         for service in self._client.services:
             chars = frozenset(c.uuid.lower() for c in service.characteristics)
             uuid = service.uuid.lower()
-            # Retain an actual AwoX instance containing both login UUIDs.
-            # Never merge instances: split Pair/Command services are invalid.
+            # Retain an actual AwoX instance with all three session characteristics.
+            # Never merge characteristics from separate instances.
             # Duplicate characteristic UUIDs remain blocked by _resolve().
             if (
                 uuid != SERVICE_UUID
                 or uuid not in services
-                or {PAIR_UUID, COMMAND_UUID}.issubset(chars)
+                or {PAIR_UUID, COMMAND_UUID, NOTIFY_UUID}.issubset(chars)
             ):
                 services[uuid] = chars
             for characteristic in service.characteristics:

@@ -23,6 +23,10 @@ The same session exposes lighting, status and direct-device setup operations.
 
 ## Bluetooth receive activation
 
+Before login, `MeshConnection` checks that Pair, Command and Notify are
+present in the same AwoX GATT service instance. Missing characteristics stop
+connection setup before the first Pair write.
+
 The Android APK enables notifications on characteristic `1911` by writing
 the CCCD descriptor `2902`. `ESPHomeNoCCCDTransport` subscribes through the
 ESPHome API without a CCCD write. Custom GATT transports provide their own

@@ -32,14 +32,14 @@ async def main():
             lamp = mesh.lamp(MESH_ID)
             await lamp.set_power(True)  # Make the following change visible.
             print("Lamp ON command sent for observation.")
-            # RGB values: 0..255 for each channel (red in this example).
+            # RGB values: 0..255 per channel. For the same red in HS, use set_hs(0, 100).
             await lamp.set_rgb(255, 0, 0)
             print("RGB color set to red (write completed).")
 
             await asyncio.sleep(2)
 
             # Native hue: 0..254; saturation: 0..255. This uses explicit saturation 255.
-            await lamp.set_color_native(169, 255)
+            await lamp.set_hs_raw(169, 255)
             print("Native hue/saturation set to 169/255 (write completed).")
 
 

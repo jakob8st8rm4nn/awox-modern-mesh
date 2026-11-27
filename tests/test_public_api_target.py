@@ -91,16 +91,16 @@ class PublicCommands(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([p[0] for p in self.packets()], [0x29, 0x30])
 
     async def test_dual_zone_native_and_rgb_match_existing_codec_bytes(self):
-        zone = 2
+        zone = 1
         await self.lamp.set_dual_zone_power(zone, True)
-        await self.lamp.set_dual_zone_brightness(zone, 50)
+        await self.lamp.set_dual_zone_brightness_percent(zone, 50)
         level = lighting.percentage_to_value(50, 2, 254)
-        await self.lamp.set_dual_zone_brightness_native(zone, level)
+        await self.lamp.set_dual_zone_brightness_raw(zone, level)
         await self.lamp.set_dual_zone_rgb(zone, 255, 0, 0)
         hue, saturation = lighting.rgb_to_native(255, 0, 0)
-        await self.lamp.set_dual_zone_color_native(zone, hue, saturation)
+        await self.lamp.set_dual_zone_hs_raw(zone, hue, saturation)
         await self.lamp.set_dual_zone_color_temperature_mired(zone, 333)
-        await self.lamp.set_dual_zone_color_temperature(zone, 3003)
+        await self.lamp.set_dual_zone_color_temperature_kelvin(zone, 3003)
         self.assertEqual(self.packets()[1], self.packets()[2])
         self.assertEqual(self.packets()[3], self.packets()[4])
         self.assertEqual(self.packets()[5], self.packets()[6])
@@ -110,6 +110,31 @@ class PublicCommands(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             await self.lamp.set_dual_zone_color_temperature_mired(zone, 999)
         self.assertEqual(len(self.packets()), 7)
+
+    async def test_hs_commands_match_raw_and_rgb_wire_bytes(self):
+        await self.lamp.set_hs(240, 50, transition=700)
+        await self.lamp.set_hs_raw(169, 127, transition=700)
+        await self.lamp.set_hs(0, 100)
+        await self.lamp.set_rgb(255, 0, 0)
+        await self.lamp.set_dual_zone_hs(0, 240, 50)
+        await self.mesh.set_dual_zone_hs_raw(ID, 0, 169, 127)
+        await self.lamp.set_dual_zone_hs(0, 0, 100)
+        await self.lamp.set_dual_zone_rgb(0, 255, 0, 0)
+        writes = [data for char, data, response in self.transport.writes if char == COMMAND_UUID]
+        self.assertEqual(len(writes), 8)
+        self.assertEqual(writes[::2], writes[1::2])
+        await self.lamp.set_hs(360, 100)
+        await self.lamp.set_hs_raw(254, 254)
+        await self.lamp.set_dual_zone_hs(0, 360, 100)
+        await self.lamp.set_dual_zone_hs_raw(0, 254, 254)
+        packets = self.packets()
+        self.assertEqual(packets[8], packets[9])
+        self.assertEqual(packets[10], packets[11])
+        with self.assertRaises(ValueError):
+            await self.lamp.set_hs(361, 100)
+        with self.assertRaises(ValueError):
+            await self.lamp.set_dual_zone_hs(0, 0, 101)
+        self.assertEqual(len(self.packets()), 12)
 
     async def test_schedule_single_and_pair_preserve_old_result_contract(self):
         class EchoSchedule(FakeTransport):

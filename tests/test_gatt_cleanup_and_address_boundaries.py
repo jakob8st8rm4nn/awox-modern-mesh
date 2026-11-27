@@ -3,6 +3,7 @@ import asyncio
 from types import ModuleType, SimpleNamespace
 from unittest.mock import patch
 import unittest
+from awox import is_valid_unicast_mesh_id
 from awox.targets import MeshTarget
 from awox.clock import build_time_with_timezone
 from awox.timezone_rule import format_apk_fixed_timezone, format_apk_dst_timezone
@@ -16,6 +17,14 @@ class NoEncode(str):
         raise AssertionError('oversized string encoded')
 
 class InputAndAddressBoundaries(unittest.TestCase):
+
+    def test_public_unicast_mesh_id_validation(self):
+        for value in (1, 0x7FFF, 0x8100, 0xFFFE):
+            with self.subTest(value=value):
+                self.assertTrue(is_valid_unicast_mesh_id(value))
+        for value in (-1, 0, 0x8000, 0x8001, 0x80FF, 0xFFFF, 0x10000, True, 1.0, '1', None):
+            with self.subTest(value=value):
+                self.assertFalse(is_valid_unicast_mesh_id(value))
 
     def test_target_address_is_read_only(self):
         for address, replacement in ((32769, 65535), (65535, 32769)):

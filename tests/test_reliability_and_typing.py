@@ -92,7 +92,7 @@ class BehaviorRegressions(unittest.IsolatedAsyncioTestCase):
         for value in (0, 255):
             self.transport.reply = (0x13, bytes((value,)))
             with self.subTest(luminosity=value):
-                self.assertEqual(await self.mesh.read_pir_luminosity(ID, timeout=.08), value)
+                self.assertEqual(await self.mesh.read_pir_luminosity_raw(ID, timeout=.08), value)
         self.assertEqual(self.count_commands(), 3)
 
     async def test_pir_malformed_notifications_are_discarded_before_valid_reply(self):
@@ -101,7 +101,7 @@ class BehaviorRegressions(unittest.IsolatedAsyncioTestCase):
                                5, 30, True, False, 2)
         for opcode, call, valid, result in (
             (0x12, self.mesh.read_pir_settings(ID, timeout=.08), expected.encode(), expected),
-            (0x13, self.mesh.read_pir_luminosity(ID, timeout=.08), b'\x00', 0),
+            (0x13, self.mesh.read_pir_luminosity_raw(ID, timeout=.08), b'\x00', 0),
         ):
             task = asyncio.create_task(call)
             for _ in range(100):
@@ -123,8 +123,8 @@ class BehaviorRegressions(unittest.IsolatedAsyncioTestCase):
         results = await asyncio.gather(
             self.mesh.read_pir_settings(ID, timeout=.012),
             self.mesh.read_pir_settings(ID + 1, timeout=.012),
-            self.mesh.read_pir_luminosity(ID, timeout=.012),
-            self.mesh.read_pir_luminosity(ID + 1, timeout=.012),
+            self.mesh.read_pir_luminosity_raw(ID, timeout=.012),
+            self.mesh.read_pir_luminosity_raw(ID + 1, timeout=.012),
         )
         self.assertEqual(results, [None, None, None, None])
         self.assertEqual(self.count_commands(), 4)

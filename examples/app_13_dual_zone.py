@@ -1,12 +1,12 @@
-"""Switch one selected Dual-Zone zone on, set it red, then switch it off.
+"""Switch the RGB-capable zone on, set it red, then switch it off.
 
-Use a compatible device and choose ZONE below. The command's zone value has
-no established universal mapping to reported endpoint IDs. Commands do not
-wait for a per-zone confirmation or restore the earlier state.
+Set the model name to match your device. The callback prints any zone
+status received during the example.
+The example sends each command once and leaves the selected zone off.
 """
 
 import asyncio
-from awox import AwoXMeshSession, ESPHomeProxy, Credentials, MeshStatusFrame
+from awox import AwoXMeshSession, ESPHomeProxy, Credentials, LampStatus
 
 # Edit the settings in your local copy; keep credentials private.
 PROXY_HOST = ""             # ESPHome Bluetooth proxy IP address or hostname
@@ -17,18 +17,15 @@ LAMP_MAC = ""               # Target Dual-Zone device MAC address
 MESH_ID = 0                 # Target mesh address (e.g. 0x1234)
 GATEWAY_MAC = LAMP_MAC      # BLE gateway in the same mesh; may differ from target
 
-ZONE = 0                    # Raw APK zone byte; no endpoint mapping is assumed.
+MODEL_NAME = "EDUAL-RGBTW-TW"  # Set the APK model name for your device.
+ZONE = 0                      # RGB-capable zone.
 
 
-def on_mesh_status(frame: MeshStatusFrame) -> None:
-    """Print any valid registered-device status, including alternate layouts."""
+def on_status(status: LampStatus) -> None:
+    """Print the state of the zone that reported."""
     print(
-        f"Endpoint status: mesh_id=0x{frame.mesh_id:04X}, "
-        f"endpoint={frame.endpoint}, layout={frame.layout}, "
-        f"power={frame.is_on}, brightness_raw={frame.brightness_raw}, "
-        f"temperature_mired={frame.white_temperature_mired}, "
-        f"temperature_percent_raw={frame.temperature_percent_raw}, "
-        f"MAC={frame.mac_address}"
+        f"Zone {status.zone}: power={status.is_on}, "
+        f"brightness={status.brightness_percent}%"
     )
 
 
@@ -42,16 +39,16 @@ async def main():
             lambda: proxy.create_transport(GATEWAY_MAC),
             credentials,
             {MESH_ID: LAMP_MAC},
-            on_mesh_status=on_mesh_status,
+            device_models={MESH_ID: MODEL_NAME},
+            on_status=on_status,
         ) as mesh:
-            # Select the same raw zone for all three commands.
+            # Select the same zone for all three commands.
             await mesh.set_dual_zone_power(MESH_ID, zone=ZONE, enabled=True)
             print(f"Zone {ZONE}: ON command sent.")
             await asyncio.sleep(2)
 
-            await mesh.set_dual_zone_rgb(
-                MESH_ID, zone=ZONE, red=255, green=0, blue=0,
-            )
+            # Hue is in degrees and saturation is in percent.
+            await mesh.set_dual_zone_hs(MESH_ID, zone=ZONE, hue_degrees=0, saturation_percent=100)
             print(f"Zone {ZONE}: red command sent.")
             await asyncio.sleep(2)
 

@@ -33,13 +33,13 @@ async def main():
             await lamp.set_power(True)  # Make the following change visible.
             print("Lamp ON command sent for observation.")
             # First use the percentage scale.
-            await lamp.set_brightness(50)
+            await lamp.set_brightness_percent(50)
             print("Brightness set to 50% (write completed).")
 
             await asyncio.sleep(2)
 
             # Then use the native scale: 220 is brighter than the previous 50%.
-            await lamp.set_brightness_native(220)
+            await lamp.set_brightness_raw(220)
             print("Native brightness set to 220 (write completed).")
 
 

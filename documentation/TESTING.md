@@ -12,8 +12,8 @@ No ESPHome installation, network account, proxy or physical device is needed.
 pytest resolves `python` and `tests` using pyproject.toml.
 
 The suite combines APK-related and synthetic crypto fixtures, stored
-reference-byte comparisons, transport/proxy regression tests, authenticated
-session tests using a fake GATT transport, and execution of all 29 examples
+reference-byte comparisons, transport/proxy regression tests, mesh login
+and session tests using a fake GATT transport, and execution of all 29 examples
 with mocked external endpoints. The Bluetooth examples use the session code against simulated external
 connections. The cloud example uses a simulated endpoint.
 

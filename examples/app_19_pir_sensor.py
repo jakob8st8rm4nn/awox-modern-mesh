@@ -1,6 +1,6 @@
 """Read PIR configuration/light level, then write one chosen configuration.
 
-Use a compatible PIR sensor. By default, NIGHT is disabled white and MOTION
+Connect directly to a compatible PIR sensor. By default, NIGHT is disabled white and MOTION
 is enabled green. The commented MOTION alternative selects a sequence instead;
 choose one configuration, not two consecutive writes. These are stored sensor
 actions, not immediate lamp colors.
@@ -23,7 +23,6 @@ MESH_NAME = ""              # AwoX mesh name
 MESH_PASSWORD = ""          # AwoX mesh password
 LAMP_MAC = ""               # Target PIR device MAC address
 MESH_ID = 0                 # Target PIR mesh address (e.g. 0x1234)
-GATEWAY_MAC = LAMP_MAC      # BLE gateway in the same mesh; may differ from target
 
 # Deliberate example values, not discovered defaults or a backup of the device.
 # Light action mode 0 = white (brightness and temperature in percent).
@@ -54,7 +53,7 @@ async def main():
 
     async with ESPHomeProxy(PROXY_HOST, PROXY_KEY) as proxy:
         async with AwoXMeshSession(
-            lambda: proxy.create_transport(GATEWAY_MAC),
+            lambda: proxy.create_transport(LAMP_MAC),
             credentials,
             {MESH_ID: LAMP_MAC},
         ) as mesh:
@@ -74,7 +73,7 @@ async def main():
             print("  Reserved flags (raw):", f"0x{settings.reserved_flags_raw:02X}")
 
             # A raw light-level byte or None; no conversion to lux is known.
-            luminosity = await mesh.read_pir_luminosity(MESH_ID, timeout=15)
+            luminosity = await mesh.read_pir_luminosity_raw(MESH_ID, timeout=15)
             print("Ambient light (raw 0..255, not lux):", luminosity)
 
             # CAUTION: 0x11 does NOT encode MESH_ID or a target address.

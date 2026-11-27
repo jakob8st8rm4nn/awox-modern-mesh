@@ -18,7 +18,13 @@ a snapshot may contain old records. Backend metadata can merge packets and is
 not necessarily one original radio advertisement.
 
 `status.parse_status_variant` exposes the APK da.b/da.c/da.d structures,
-including raw provisioning/endpoint fields. `parse_lamp_status` is a separate,
-conservative lamp-only view. StatusStore checks known IDs and MAC tails.
+including the raw provisioning code and `zone_raw`. `parse_lamp_status` is a separate,
+conservative lamp-only view for the observed `da.d` layout. `StatusStore`
+also accepts supported main lamp `da.b` and `da.c` lamp observations.
+The raw session cache and lamp view match the registered mesh ID and the
+full MAC for `da.b` or the transmitted MAC suffix for the other layouts.
+The `da.d` byte at payload offset 11 is retained as raw data.
 Remote/PIR frames remain inspectable without being published as lamp state.
+The advertisement hue conversion can report 360° for raw hue 254. The HS
+setters accept that angle and encode it as raw hue 254.
 These are decoders, not capability negotiation or authenticated statements.

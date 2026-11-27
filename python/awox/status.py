@@ -11,12 +11,16 @@ from __future__ import annotations
 
 import re
 import time
-from dataclasses import dataclass
+from colorsys import hsv_to_rgb
+from dataclasses import dataclass, replace
 from typing import Callable, Mapping
 
 from .frames import ExtendedCommand, ExtendedNotification, _frame_bytes, addressed_query
-from ._validation import _validate_received_at, _valid_mesh_destination, _valid_unicast_mesh_id
-from .model_properties import _is_light_model
+from ._numeric import percentage_to_value, value_to_percentage
+from ._validation import _validate_received_at, _valid_mesh_destination, is_valid_unicast_mesh_id
+from .model_properties import (
+    _is_light_model, _is_light_model_name, lookup_dual_zone_properties, lookup_model_properties,
+)
 
 _MAC = re.compile(r"(?:[0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}\Z")
 
@@ -36,21 +40,53 @@ class LampStatus:
     """
     mesh_id: int
     mac_tail_reversed: bytes
-    product_code: bytes
-    mode: int
+    product_code: bytes | None
+    mode: int | None
     is_on: bool | None
     brightness_raw: int
-    hue_raw: int | None
-    saturation_raw: int | None
+    hs_raw: tuple[int, int] | None
     white_temperature_mired: int | None
     source_opcode: int
     received_monotonic: float
     raw_response: bytes = b""
+    temperature_percent_raw: int | None = None
+    zone: int | None = None
 
     @property
-    def endpoint_id(self) -> int | None:
-        """Endpoint byte in the supported 20-byte APK status layout."""
-        return self.raw_response[3] if len(self.raw_response) == 20 else None
+    def brightness_percent(self) -> int:
+        """Return the APK-rounded brightness percentage (0..100)."""
+        return value_to_percentage(self.brightness_raw, 2, 254)
+
+    @property
+    def color_temperature_mired(self) -> int | None:
+        """Return the available white temperature in mired."""
+        return self.white_temperature_mired
+
+    @property
+    def color_temperature_kelvin(self) -> int | None:
+        """Return the available white temperature, rounded to integer Kelvin."""
+        mired = self.color_temperature_mired
+        return round(1_000_000 / mired) if mired is not None and mired > 0 else None
+
+    @property
+    def hs(self) -> tuple[float, float] | None:
+        """Return color as (hue degrees, saturation percent) when available."""
+        if self.hs_raw is None:
+            return None
+        hue, saturation = self.hs_raw
+        if not 0 <= hue <= 254 or not 0 <= saturation <= 255:
+            return None
+        return (hue * 360.0 / 254) % 360.0, min(254, saturation) * 100.0 / 254
+
+    @property
+    def rgb(self) -> tuple[int, int, int] | None:
+        """Return RGB color at full HSV value, with brightness reported separately."""
+        hs = self.hs
+        if hs is None:
+            return None
+        hue, saturation = hs
+        red, green, blue = hsv_to_rgb(hue / 360.0, saturation / 100.0, 1.0)
+        return int(red * 255 + 0.5), int(green * 255 + 0.5), int(blue * 255 + 0.5)
 
     @property
     def provisioning_state_code(self) -> int | None:
@@ -58,93 +94,88 @@ class LampStatus:
 
         Retains the firmware value without guessing a named state.
         """
-        return self.raw_response[19] if len(self.raw_response) == 20 else None
+        if len(self.raw_response) < 19:
+            return None
+        return self.raw_response[19 if len(self.raw_response) == 20 else 18]
 
     @property
-    def is_color_mode(self) -> bool:
+    def is_color_mode(self) -> bool | None:
         """Return the decoded color-mode flag."""
-        return bool(self.mode & 0x02)
+        return None if self.mode is None else bool(self.mode & 0x02)
 
     @property
-    def color_cycle_active(self) -> bool:
+    def color_cycle_active(self) -> bool | None:
         """Return the decoded color-cycle flag."""
-        return bool(self.mode & 0x04)
+        return None if self.mode is None else bool(self.mode & 0x04)
 
     @property
-    def candle_active(self) -> bool:
+    def candle_active(self) -> bool | None:
         """Return the decoded candle-effect flag."""
-        return bool(self.mode & 0x10)
+        return None if self.mode is None else bool(self.mode & 0x10)
 
 
 def parse_lamp_status(
     notification: ExtendedNotification, *, received_at: float | None = None
 ) -> LampStatus | None:
-    """Parse the *observed* 0x80/0x82 EGLO_ZM_RGB_TW status layout.
+    """Decode the main lamp status in the da.d layout.
 
-    Returns None for other kinds (including 0x0B address replies), malformed
-    layouts, non-lamp/unknown models and unsupported variants. Registered
-    properties select lamps; this is not hardware validation of every model.
-    The evidence does not authenticate frames.
-    received_at must be a finite numeric monotonic timestamp or None (now).
+    Use StatusStore to resolve alternate layouts against registered devices.
+    received_at is a finite monotonic timestamp or None (now).
     """
-    if (
-        notification.opcode not in (0x80, 0x82)
-        or notification.kind != "mesh_status_raw"
-    ):
+    payload = notification.payload
+    if isinstance(payload, (bytes, bytearray, memoryview)):
+        size = payload.nbytes if isinstance(payload, memoryview) else len(payload)
+        if size != 19:
+            return None
+    frame = parse_status_variant(notification)
+    if frame is None or (frame.zone_raw != 1 or not _is_supported_da_d_lamp(frame)):
         return None
-    try:
-        payload = notification.payload
-        if isinstance(payload, (bytes, bytearray, memoryview)):
-            size = payload.nbytes if isinstance(payload, memoryview) else len(payload)
-            if size != 19:
-                return None
-        p = _frame_bytes(payload, "status payload")
-    except (TypeError, ValueError):
-        return None
-    # Recorded notification: 1 plaintext opcode + 19 decrypted/tail bytes.
-    if len(p) != 19 or p[2:5] != b"\x01\x00\x00" or p[11] != 0x01:
-        return None
-    mesh_id = int.from_bytes(p[:2], "little")
-    if (
-        (mesh_id in (0, 0xFFFF) or 0x8000 <= mesh_id <= 0x80FF)
-        or p[5:7] == b"\x00\x00"
-        or p[7:11] == bytes(4)
-    ):
-        return None
-    # This convenience API is a lighting view, not the raw APK status
-    # dispatcher. Model bytes are reversed relative to the descriptor register.
-    code = bytes((p[6] & ~0x10, p[5]))
-    if _is_light_model(code) is not True:
-        return None
-    # The APK decodes the state as a bit field, not an enum:
-    # bit 0 = power, bit 1 = colour, bit 2 = colour cycle, bit 4 = candle.
-    # Keep the entire raw mode byte, including unknown bits. Unknown flags
-    # alone do not invalidate a status; only the known bits are interpreted.
-    mode = p[12]
-    is_on = bool(mode & 0x01)
-    is_color = bool(mode & 0x02)
+    status = _lamp_status_from_frame(frame)
+    if received_at is not None:
+        status = replace(status, received_monotonic=_validate_received_at(received_at))
+    return status
 
-    # White temperature and HSV are selected by the colour bit, independent
-    # of power. Unusual white-temperature values are not interpreted as valid
-    # UI temperatures, but must not discard the rest of a status observation.
-    # The exact received bytes are still available in raw_response[15:17].
-    temp_raw = int.from_bytes(p[14:16], "little")
-    white_temp = temp_raw if not is_color and 153 <= temp_raw <= 454 else None
 
-    received_at = _validate_received_at(received_at)
+def _packet_light_model(product_code: bytes) -> bool | None:
+    return _is_light_model(bytes((product_code[1] & ~0x10, product_code[0])))
+
+
+def _is_supported_da_d_lamp(frame: MeshStatusFrame) -> bool:
+    return (
+        frame.layout == "da.d"
+        and is_valid_unicast_mesh_id(frame.mesh_id)
+        and frame.mac_tail_reversed != bytes(4)
+        and frame.raw_response[6:8] != bytes(2)
+        and _packet_light_model(frame.raw_response[6:8]) is True
+    )
+
+
+def _lamp_status_from_frame(
+    frame: MeshStatusFrame, *, zone: int | None = None
+) -> LampStatus:
+    white_zone = zone == 1
+    is_color = not white_zone and bool(frame.mode & 0x02)
+    percent = frame.temperature_percent_raw if not is_color else None
+    temperature = frame.white_temperature_mired
+    if percent is not None and percent <= 100:
+        temperature = percentage_to_value(percent, 153, 454)
     return LampStatus(
-        mesh_id=mesh_id,
-        mac_tail_reversed=p[7:11],
-        product_code=p[5:7],
-        mode=mode,
-        is_on=is_on,
-        brightness_raw=p[13],
-        hue_raw=p[16] if is_color else None,
-        saturation_raw=p[17] if is_color else None,
-        white_temperature_mired=white_temp,
-        source_opcode=notification.opcode,
-        received_monotonic=time.monotonic() if received_at is None else received_at,
-        raw_response=bytes((notification.opcode,)) + p,
+        mesh_id=frame.mesh_id,
+        mac_tail_reversed=frame.mac_tail_reversed,
+        product_code=None if frame.mac_embedded_full else frame.raw_response[6:8],
+        mode=None if white_zone else frame.mode,
+        is_on=bool(frame.mode & 0x01),
+        brightness_raw=frame.brightness_raw,
+        hs_raw=(frame.hue_raw, frame.saturation_raw) if is_color else None,
+        white_temperature_mired=(
+            temperature if not is_color and temperature is not None and 153 <= temperature <= 454
+            else None
+        ),
+        source_opcode=frame.source_opcode,
+        received_monotonic=frame.received_monotonic,
+        raw_response=frame.raw_response,
+        temperature_percent_raw=percent,
+        zone=zone,
     )
 
 
@@ -167,17 +198,25 @@ class StatusStore:
         self,
         devices: Mapping[int, str],
         *,
+        device_models: Mapping[int, str] | None = None,
         on_change: Callable[[LampStatus], None] | None = None,
     ) -> None:
         if on_change is not None and not callable(on_change):
             raise TypeError("on_change must be callable or None")
         self._expected = {}
         for mesh_id, mac in devices.items():
-            if not _valid_unicast_mesh_id(mesh_id):
+            if not is_valid_unicast_mesh_id(mesh_id):
                 raise ValueError("invalid unicast mesh ID")
             self._expected[mesh_id] = _mac_tail_reversed(mac)
         if len(set(self._expected.values())) != len(self._expected):
             raise ValueError("device MAC tails are not unique")
+        self._device_macs = {mesh_id: mac.upper() for mesh_id, mac in devices.items()}
+        self._device_models = dict(device_models) if device_models is not None else {}
+        for mesh_id, model in self._device_models.items():
+            if not is_valid_unicast_mesh_id(mesh_id) or mesh_id not in self._expected:
+                raise ValueError("device_models requires a registered mesh ID")
+            if not isinstance(model, str) or not model:
+                raise ValueError("device model must be a nonempty APK model name")
         self._states: dict[int, LampStatus] = {}
         self.on_change = on_change
 
@@ -196,11 +235,45 @@ class StatusStore:
         """Discard all stored statuses."""
         self._states.clear()
 
+    def _matches_identity(self, frame: MeshStatusFrame) -> bool:
+        if frame.mac_embedded_full:
+            return self._device_macs.get(frame.mesh_id) == frame.mac_address
+        # The prefix shown on compact frames is reconstructed, not transmitted.
+        return self._expected.get(frame.mesh_id) == frame.mac_tail_reversed
+
     def _match(self, notification: ExtendedNotification) -> LampStatus | None:
-        state = parse_lamp_status(notification)
-        if state is not None and self._expected.get(state.mesh_id) == state.mac_tail_reversed:
-            return state
-        return None
+        frame = parse_status_variant(notification)
+        if frame is None or not self._matches_identity(frame):
+            return None
+        return self._lamp_view(frame)
+
+    def _lamp_view(
+        self, frame: MeshStatusFrame, *, include_secondary: bool = False
+    ) -> LampStatus | None:
+        model = self._device_models.get(frame.mesh_id)
+        if model is not None and lookup_model_properties(model) is None:
+            model = None
+        zone = None
+        # APK h7.e.p() selects the main block for 1 and the second block otherwise.
+        if model is not None:
+            candidate = 0 if frame.zone_raw == 1 else 1
+            if lookup_dual_zone_properties(model, candidate) is not None:
+                zone = candidate
+        if frame.zone_raw != 1 and not (include_secondary and zone == 1):
+            return None
+        if model is not None and not _is_light_model_name(model):
+            return None
+        if frame.layout == "da.d":
+            if not _is_supported_da_d_lamp(frame):
+                return None
+        elif frame.layout == "da.b":
+            if model is None:
+                return None
+        else:
+            packet_model_is_light = _packet_light_model(frame.raw_response[6:8])
+            if packet_model_is_light is False or (packet_model_is_light is None and model is None):
+                return None
+        return _lamp_status_from_frame(frame, zone=zone)
 
     def observe(
         self, notification: ExtendedNotification
@@ -213,7 +286,9 @@ class StatusStore:
         Even unchanged observations refresh received_monotonic. Only changed
         states invoke on_change. No authentication or query ACK is implied.
         """
-        state = self._match(notification)
+        return self._observe_lamp(self._match(notification))
+
+    def _observe_lamp(self, state: LampStatus | None) -> tuple[LampStatus | None, bool]:
         if state is None:
             return None, False
         previous = self._states.get(state.mesh_id)
@@ -221,16 +296,16 @@ class StatusStore:
             previous.product_code,
             previous.mode,
             previous.brightness_raw,
-            previous.hue_raw,
-            previous.saturation_raw,
+            previous.hs_raw,
             previous.white_temperature_mired,
+            previous.temperature_percent_raw,
         ) == (
             state.product_code,
             state.mode,
             state.brightness_raw,
-            state.hue_raw,
-            state.saturation_raw,
+            state.hs_raw,
             state.white_temperature_mired,
+            state.temperature_percent_raw,
         )
         # Store the new timestamp (and source opcode) for BOTH changes and
         # repeats. Repeated status reports are not decoder errors.
@@ -251,9 +326,9 @@ class StatusStore:
 
 @dataclass(frozen=True)
 class MeshStatusFrame:
-    """Decoded raw mesh endpoint status, separate from the LampStatus view."""
+    """Decoded mesh status with the original zone_raw byte."""
     mesh_id: int
-    endpoint: int
+    zone_raw: int
     layout: str
     mac_address: str
     mac_embedded_full: bool
@@ -320,12 +395,12 @@ def parse_status_variant(
         temperature_percent = None
         hue, saturation, provision = p[16:19]
     light_model = (
-        None if layout == "da.b" else _is_light_model(bytes((p[6] & ~0x10, p[5])))
+        None if layout == "da.b" else _packet_light_model(p[5:7])
     )
     received_at = _validate_received_at(received_at)
     return MeshStatusFrame(
         mesh_id=int.from_bytes(p[:2], "little"),
-        endpoint=p[2],
+        zone_raw=p[2],
         layout=layout,
         mac_address=full,
         mac_embedded_full=(layout == "da.b"),

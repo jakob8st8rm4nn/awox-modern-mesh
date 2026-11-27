@@ -47,7 +47,8 @@ class FakeTransport:
                 await self.block_command.wait()
 
     def emit(self, opcode, payload):
-        payload = payload.ljust(19, b'\0')
+        if opcode not in (0x80, 0x82) or len(payload) < 18:
+            payload = payload.ljust(19, b'\0')
         self.callback(bytes((opcode,)) + aes_att_encryption(self.key, payload[:16]) + payload[16:])
 
     async def start_notify(self, characteristic, callback):
@@ -244,7 +245,7 @@ class SessionOperations(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.commands(), [])
 
     async def test_concurrent_lights_remain_ordered_no_added_waits(self):
-        await asyncio.gather(*(self.session.lamp(ID).set_brightness(p) for p in range(50)))
+        await asyncio.gather(*(self.session.lamp(ID).set_brightness_percent(p) for p in range(50)))
         self.assertEqual(len(self.commands()), 50)
 
     async def test_82_status_early_during_query_ignores_passive_age_filter(self):
@@ -254,6 +255,160 @@ class SessionOperations(unittest.IsolatedAsyncioTestCase):
         self.transport.reply = (0x82, payload)
         status = await self.session.read_status(ID, timeout=.03)
         self.assertIsNotNone(status)
+
+    async def test_dual_zone_setters_reject_unknown_zones_without_sending(self):
+        lamp = self.session.lamp(ID)
+        for method, args in (
+            (lamp.set_dual_zone_power, (True,)),
+            (lamp.set_dual_zone_brightness_percent, (50,)),
+            (lamp.set_dual_zone_brightness_raw, (128,)),
+            (lamp.set_dual_zone_rgb, (255, 0, 0)),
+            (lamp.set_dual_zone_hs_raw, (0, 254)),
+            (lamp.set_dual_zone_hs, (0, 100)),
+            (lamp.set_dual_zone_color_temperature_kelvin, (3000,)),
+            (lamp.set_dual_zone_color_temperature_mired, (333,)),
+        ):
+            for zone in (2, 255, -1, True):
+                with self.subTest(method=method.__name__, zone=zone):
+                    with self.assertRaisesRegex(ValueError, "zone must be 0 or 1"):
+                        await method(zone, *args)
+        self.assertEqual(self.commands(), [])
+
+    async def test_dual_zone_status_uses_apk_mapping_and_caches_valid_observations(self):
+        payload = bytes.fromhex("3412 02 0063 33221138c1a4 01 17 28 4d01 50be 60")
+        lamp = self.session.lamp(ID)
+        self.transport.emit(0x80, payload)
+        await asyncio.sleep(0)
+        self.assertIsNotNone(self.session.mesh_states.get((ID, 2)))
+        self.assertIsNone(lamp.get_status(1))
+
+        await self.session.disconnect()
+        observed = []
+        self.session = AwoXMeshSession(
+            lambda: self.transport, CREDS, {ID: MAC},
+            device_models={ID: "EDUAL-RGBTW-TW"}, on_status=observed.append,
+        )
+        await self.session.connect()
+        lamp = self.session.lamp(ID)
+        self.transport.writes.clear()
+        for zone_raw in (0, 1, 2, 3):
+            self.transport.emit(0x82, bytes.fromhex("3412") + bytes((zone_raw,))
+                                + bytes.fromhex("0000 2820 33221138 01 01 80 00 00 00 60 00"))
+            await asyncio.sleep(0)
+            self.assertIn((ID, zone_raw), self.session.mesh_states)
+            self.assertIsNone(lamp.get_status(0 if zone_raw == 1 else 1))
+        self.assertEqual(observed, [])
+        self.transport.emit(0x82, payload)
+        await asyncio.sleep(0)
+        second = lamp.get_status(1)
+        raw = self.session.mesh_states[(ID, 2)]
+        self.assertEqual(raw.mode, 0x17)
+        self.assertEqual(raw.zone_raw, 2)
+        self.assertEqual(second.zone, 1)
+        self.assertEqual(second.received_monotonic, raw.received_monotonic)
+        self.assertEqual(second.raw_response, raw.raw_response)
+        self.assertTrue(second.is_on)
+        self.assertEqual(second.brightness_raw, 40)
+        self.assertEqual(second.white_temperature_mired, 333)
+        self.assertEqual(second.color_temperature_kelvin, 3003)
+        self.assertIsNone(second.hs)
+        self.assertIsNone(second.rgb)
+        for name in ("mode", "is_color_mode", "hs_raw",
+                     "candle_active", "color_cycle_active"):
+            with self.subTest(field=name):
+                self.assertIsNone(getattr(second, name))
+        self.assertIsNone(lamp.get_status(0))
+        self.transport.emit(0x80, payload[:2] + b"\x01" + payload[3:13] + b"\x61" + payload[14:])
+        await asyncio.sleep(0)
+        first = lamp.get_status(0)
+        self.assertEqual(first.zone, 0)
+        self.assertEqual(first.brightness_raw, 97)
+        self.assertEqual(first.hs_raw, (80, 190))
+        self.assertTrue(first.is_color_mode)
+        self.assertTrue(first.candle_active)
+        self.assertTrue(first.color_cycle_active)
+        self.assertEqual(lamp.get_status(1), second)
+        self.assertEqual(lamp.status, first)
+        self.assertEqual(self.session.get_status(ID, zone=1), second)
+        self.assertEqual(observed, [second, first])
+        for count, zone_raw in enumerate((0, 3, 255), start=3):
+            with self.subTest(zone_raw=zone_raw):
+                self.transport.emit(0x82, payload[:2] + bytes((zone_raw,)) + payload[3:])
+                await asyncio.sleep(0)
+                raw = self.session.mesh_states[(ID, zone_raw)]
+                self.assertEqual(raw.zone_raw, zone_raw)
+                self.assertEqual(observed[-1].zone, 1)
+                self.assertEqual(observed[-1].raw_response, raw.raw_response)
+                self.assertEqual(observed[-1], lamp.get_status(1))
+                self.assertEqual(len(observed), count)
+                self.assertEqual(lamp.status, first)
+        last_valid = observed[-1]
+        rejected = bytes.fromhex("3412 FF 0000 2820 33221138 01 01 80 00 00 00 60 00")
+        self.transport.emit(0x82, rejected)
+        await asyncio.sleep(0)
+        self.assertEqual(self.session.mesh_states[(ID, 255)].raw_response, bytes((0x82,)) + rejected)
+        self.assertEqual(lamp.get_status(1), last_valid)
+        self.assertEqual(len(observed), 5)
+        self.assertEqual(lamp.status, first)
+        self.assertEqual(self.transport.writes, [])
+        with self.assertRaises(ValueError):
+            lamp.get_status(True)
+        self.session._status_max_age = .000001
+        await asyncio.sleep(.001)
+        self.assertIsNone(lamp.get_status(1))
+        self.session._status_max_age = None
+        await self.session.disconnect()
+        self.assertIsNone(lamp.get_status(0))
+        self.assertIsNone(lamp.get_status(1))
+
+    async def test_read_full_mac_status_requires_known_lamp_and_exact_mac(self):
+        payload = bytes.fromhex("3412 01 0100 33221138c1a4 01 11 80 4d01 50be 60")
+        self.transport.reply = (0x80, payload)
+        self.assertIsNone(await self.session.read_status(ID, timeout=.01))
+        self.assertIn((ID, 1), self.session.mesh_states)
+        await self.session.disconnect()
+        self.session = AwoXMeshSession(
+            lambda: self.transport, CREDS, {ID: MAC},
+            device_models={ID: "EGLO-ZM-RGB-TW"},
+        )
+        await self.session.connect()
+        for offset, replacement in ((0, 0x35), (5, 0x32), (9, 0xC2), (2, 2)):
+            invalid = bytearray(payload)
+            invalid[offset] = replacement
+            self.transport.reply = (0x80, invalid)
+            self.assertIsNone(await self.session.lamp(ID).read_status(timeout=.01))
+
+        self.transport.reply = (0x80, payload)
+        status = await self.session.lamp(ID).read_status(timeout=.1)
+        self.assertIsNotNone(status)
+        self.assertIsNone(status.product_code)
+        self.assertEqual(status.white_temperature_mired, 333)
+        self.assertTrue(status.is_on)
+        self.assertTrue(status.candle_active)
+        self.assertIsNone(status.zone)
+        self.assertEqual(status.provisioning_state_code, 0x60)
+        self.assertIsNotNone(self.session.get_status(ID))
+
+    async def test_read_compact_status_uses_temperature_percentage_and_status_bits(self):
+        self.transport.writes.clear()
+        for mode, percent, mired, hue, tail in ((0x11, 60, 334, None, b""),
+                                               (0x01, 255, None, None, b"\x00\x00"),
+                                               (0x07, 60, None, 80, b"")):
+            with self.subTest(mode=mode, percent=percent):
+                payload = bytes.fromhex("3412 01 0000 9620 33221138 01")
+                payload += bytes((mode, 128, percent, 80, 190, 0x60)) + tail
+                self.transport.reply = (0x82, payload)
+                result = await self.session.read_status(ID, timeout=.1)
+                self.assertIsNotNone(result)
+                self.assertEqual(result.white_temperature_mired, mired)
+                self.assertEqual(result.temperature_percent_raw, None if hue else percent)
+                self.assertEqual(result.hs_raw, (hue, 190) if hue is not None else None)
+                self.assertEqual(result.color_cycle_active, mode == 0x07)
+                self.assertEqual(result.provisioning_state_code, 0x60)
+
+        self.assertEqual(self.commands(), [bytes.fromhex("0a3412")] * 3)
+        self.transport.reply = (0x82, payload[:7] + b"\x00" + payload[8:])
+        self.assertIsNone(await self.session.read_status(ID, timeout=.01))
 
 
     async def test_duplicate_pending_window_is_rejected_before_second_write(self):

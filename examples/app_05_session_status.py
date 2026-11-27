@@ -5,7 +5,7 @@ these later prints do not send status polls. Expiry is visible only if no new
 status arrives. A live session does not prove that every mesh lamp is reachable.
 No light settings are changed and no automatic reconnect is attempted.
 The separate on_mesh_status callback also reports APK status layouts and
-endpoints for registered devices, without assuming zone-number mappings.
+raw zone bytes for registered devices.
 """
 
 import asyncio
@@ -18,6 +18,7 @@ MESH_NAME = ""              # AwoX mesh name
 MESH_PASSWORD = ""          # AwoX mesh password
 LAMP_MAC = ""               # Target lamp Bluetooth MAC address
 MESH_ID = 0                 # Target lamp mesh ID (for example 0x1234)
+LAMP_MODEL = ""             # APK model name; required for full-MAC da.b status
 GATEWAY_MAC = LAMP_MAC      # BLE gateway in the same mesh; may differ from target
 
 STATUS_MAX_AGE = 10.0       # Seconds without a fresh status observation
@@ -37,7 +38,7 @@ def on_mesh_status(frame: MeshStatusFrame) -> None:
     """Observe all three APK status layouts for a registered MAC/mesh ID."""
     print(
         f"on_mesh_status: mesh_id=0x{frame.mesh_id:04X}, "
-        f"endpoint={frame.endpoint}, layout={frame.layout}, "
+        f"zone_raw={frame.zone_raw}, layout={frame.layout}, "
         f"MAC={frame.mac_address}, embedded_full_MAC={frame.mac_embedded_full}, "
         f"mode=0x{frame.mode:02X}, temperature_mired={frame.white_temperature_mired}, "
         f"temperature_percent_raw={frame.temperature_percent_raw}"
@@ -58,6 +59,7 @@ async def main():
             lambda: proxy.create_transport(GATEWAY_MAC),
             credentials,
             {MESH_ID: LAMP_MAC},
+            device_models={MESH_ID: LAMP_MODEL} if LAMP_MODEL else None,
             on_status=on_status,
             on_mesh_status=on_mesh_status,
             on_disconnect=on_disconnect,
@@ -72,7 +74,7 @@ async def main():
                 await asyncio.sleep(PRINT_INTERVAL_SECONDS)
                 print(f"After {elapsed}s: connected={mesh.connected}")
                 print("Cached states (fresh only):", mesh.states)
-                print("Cached endpoint frames (fresh only):", mesh.mesh_states)
+                print("Cached raw status frames (fresh only):", mesh.mesh_states)
 
             # After STATUS_MAX_AGE seconds without any fresh observation,
             # the entry vanishes from mesh.states, without a callback.
